@@ -412,7 +412,14 @@ examples in the paper claiming as stepsizes goes to zero the noise goes to zero
 as well. The estimation can be done using along diagonal approximation, or  
 low-rank approximations. 
 
-Sampling via Stochastic Gradient Fisher-Scoring (SGFS) was proposed 
+Sampling via Stochastic Gradient Fisher-Scoring (SGFS) was proposed in
+\cite{ahn2012bayesian}.
+
+
+Sampling via Stochastic Gradient thermostat. 
+
+Sampling via pre-conditioned Stochastic Gradient langevin dynamics. 
+
 Applying MCMC methods to large datasets often involve 2 problems. First, evaluating the unnormalized posterior density
 \[ p(D|\theta) = \prod_{i=1}^n p(x_i|\theta) \]
  is equivalent to passing through all datapoints, which alone can make the sampling algorithm unacceptably slow since all versions of the Metropolis-Hastings sampler requires such evaluations for proposing new samples. Second, models that require MCMC samples when a large number of datapoints are available are necessarily singular models. Using the terminology of \cite{watanabe2009algebraic}, regular models are models for which the bayesian central limit theorem \cite{le2012asymptotic} holds, that is, when the number of observations goes to infinity the posterior distribution of $\theta$ converges to a Gaussian distribution. Models that are non-regular are called singular models. A lot of methods designed to scale MCMC \cite{neiswanger2013asymptotically,scott2016bayes,} ultimately rely on this asymptotic normality for validity. Bayesian logistic regression is a classical model for which the CLT holds and is used in many papers to demonstrate the effectiveness of newly proposed large-scale MCMC methods. However, the very fact that asympotitic normality holds means there is little added utility to drawing MCMC samples from the posterior distribution, since a normal approximation would suffice. On the other hand, for singular models there is no guarantee that the estimates converge to the target posterior distribution. 
@@ -508,6 +515,12 @@ Also, the theory of adaptive HMC relies on assumptions about the HMC which is st
 There is also an older version of adaptive HMC which uses predictive performance to adjust tuning parameters adaptively. The two need to be compared, along with immediate stochastic gradient extension. 
 Propose a stochastic gradient extension to adaptive HMC. Replace the sampler by stochastic gradient version.  
 
+Adaptive MCMC means varying the tuning parameters (stepsize, trajectory length)
+while sampling along the chain. Since all samples collected need to converge to
+the target distribution, the requirement is much more strict on the sampler.
+On the other hand, we can simply consider the sampler as a black-box and select
+tuning parameters as we would using bayesian optimization.
+\cite{snoek2012practical}.
 \section{Bayesian Model Selection and Prediction}
 In a neural network model there are multiple hyperparameters left to be tuned be
 the user. These include the number of hidden layers, the number of hidden
@@ -602,6 +615,27 @@ Collect problems on which to fit neural networks of modest size.
 
 Example 1: Mackay's robot arm's data. 
 
+This is a regression problem where the data is generated as follows:
+\[ y_1 = 2.0 * \cos(x_1) + 1.3 \cos(x_1+x_2) + z_1 \]
+\[ y_2 = 2.0 * \sin(x_1) + 1.3 \sin(x_1+x_2) + z_2 \]
+where $z_1,z_2$ are independent Gaussian random variables of standard deviation
+$0.05$ and $x_1$ is uniformly generated from $[-1.932,-0.453]\cup
+[0.453,1.932]$, and $x_2$ is uniformly generated from the range $[0.534,3.142]$.
+200 training cases and 200 test cases were generated according to the equations
+above. 
+
+A neural network with a single hidden-layer of 16 hidden units was used to model
+the data.
+
+Bayesian logistic regression with hierarchical prior. Following \cite{zhang2014semi}
+
+1. Sample weights with HMC, sample hyperparameter with Gibbs sampling.
+
+2. Sample weights and hyperparamter at the same time with RMHMC (soft-abs metric).
+
+3. Semi-separable Hamiltonian Monte Carlo
+
+4.   
 Test robustness of consensus mcmc to poor mixing. Split data into a $K$ subsets randomly, $K$ being a manageable small number (5 or 8), then tune some posterior distribution samplers to mix well and some others don't. Test on both regular and singular models.
  
 For neural networks being used to fit a small number of observations relative to its dimension, there is a problem of overfitting. In \cite{gal2015bayesian}, it was shown that approximate bayesian inference via dropout helps to mitigate this problem. We argue that MCMC sampling would achieve even better performance.
