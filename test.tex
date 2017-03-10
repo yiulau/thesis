@@ -85,7 +85,7 @@ of drawing samples from each of the $p$ conditional distributions in turn,
 visiting each component deterministically or randomly. (Insert reference to
 random vs fixed scan Gibbs sampler)
 
-
+Evaluate sample quality
 Effective sample size is defined as 
 \[ ESS = N \{ 1 + 2 \sum_k \gamma(k) \}^{-1}, \]
 
@@ -95,10 +95,14 @@ monotone sequence estimator \cite{geyer1992practical}
 It is a useful metric for measuring quality of the samples obtained from a Markov Chain. We can take the mean or min ESS across alll covariates.
 
 Convergence diagnostics for high-dimensional target distributions. Theoretically, need convergence of the Markov Chain to the joint distribution, in practice only convergence to marginal distributions are checked. The literature has only looked at applying univariate diagnostics to each parameter individually and then calculate some summary statistic (mean,min) or carry out multiple testing if the diagnostic is based on a hypothesis test.
+
+KL-divergence can be used to compare samples drawn from two different samplers.
+The method advanced in \cite{boltz2007knn,boltz2007high} uses a kernel estimator to estimate the KL divergence between two empiricial distributions. The curse of dimensionality makes it difficult for application to high-dimensional posterior distributions $p(\theta|x)$, however, we can apply it to marginal predictive distributions $p(y|D)$ which usually are low-dimensional, when the covariates $x$ are fixed.
+
 \item Hamiltonian Monte Carlo. Theory(detailed balance, geometry, leapfrog integrator, symplecticity) and how to tune it(optimal accpetance probability). No U-Turn sampler and STAN. 
 
 Auxillary variable methods. 
-
+x
 Suppose we have a density $p(x),x \in \mathcal{R}^d$ from which we would like to sample. If $p(x)$ is simply the marginal density of some distribution $p(x,y), (x,y) \in \mathcal{R}^{d+p}$ in a larger space containing the original domain, then sampling from $p(x,y)$ and keeping only the $x$'s is equivalent to sampling from $p(x)$ directly. These extra variables introduced are called auxillary variables. The auxillary variables method are known to speed up sampling by introducing extra degrees of freedom in the state space and allows the chain to move more easily across different parts of it. The Swendsen-Wang sampler \cite{wang1990cluster}, the slice sampler\cite{wang1990cluster} are well known examples of this class of methods. See \cite{liang2011advanced,liu2008monte} for more details.
 
 The Metropolis-Hastings sampler is a general algorithm that allows us to sample from any distribution, discrete, continuous or neither, as long as we know its density up to normality. The Hamiltonian Monte Carlo (HMC) sampler restricts the generality by requiring that the unnormalized density be continuous and differentiable. 
@@ -368,9 +372,12 @@ Variationa inference for bayesian neural networks started with the work of \cite
 
 Graves' work \cite{graves2011practical} built on the the Hinton's paper and introduced a stochastic gradient variational method. However, the stochastic gradient estimates are biased and the prior is limited to be Gaussian. In \cite{blundell2015weight} this is further improved upon using the re-parametrization trick \cite{opper2009variational,kingma2013auto,rezende2014stochastic}. This yields the Bayes by Backprops (BBB) algorithm.
 
-The Expectation propogation (EP) approach to approximate inference in BNNs was experimented in \cite{jylanki2014expectation} but saw little follow-up because they method the authors developed was batch-only and could not scale to large datasets.A stochastic version was designed by \cite{hernandez2015probabilistic}, called the Probabilistic Backpropogation (PBP), and was shown to perform well on a wide range of test datasets.
+The Expectation propogation (EP) approach to approximate inference in BNNs was experimented in \cite{jylanki2014expectation} but saw little follow-up because they method the authors developed was batch-only and could not scale to large datasets.A stochastic version was designed by \cite{hernandez2015probabilistic}, called the Probabilistic Backpropogation (PBP), and was shown to perform well on a wide range of test datasets. However, it has the limitation of being applicable only to regression problems. In \cite{ghosh2016assumed} it is extended to multiclass classification problems through a monte carlo approximation. 
 
 In Myshkov et al's submission to a NIPS workshop (cite), the authors analyzed the performance of a few approximate inference algorithms for BNNs against the "gold-standard" that is the HMC, among those tested were PBP and EP. And they did not perform too poorly against MCMC methods. More analysis of this work to come later.  
+
+In Bayesian dark knowlege, we also try to minimize the KL divergence, but do so
+in a way that compresses model knowledge.  
 
 Why do we assume the prior distribution of weight parameters to be normal centered at 0?
 
@@ -508,7 +515,9 @@ where $H$ is the Hessian matrix of $f(x)$ evaluated at $f(x)$, that is,
 
 Automatic tuning of MCMC algorithms:
 
-If datasubsetting / parallel MCMC is to be sucessful, the intensely manual task of tuning the samplers must be automated. The Stan software comes with an optimized U-turn sampler \cite{} which automates the selection of trajectory length. There is also the adaptive MCMC literature which have created adaptive methods for Hamiltonian Monte Carlo. However, all of those methodologies mentioned above is batch only, which limits applicability. 
+If datasubsetting / parallel MCMC is to be sucessful, the intensely manual task
+of tuning the samplers must be automated. The Stan software comes with an
+optimized U-turn sampler \cite{hoffman2014no} that automates the selection of trajectory length. There is also the adaptive MCMC literature which have created adaptive methods for Hamiltonian Monte Carlo. However, all of those methodologies mentioned above is batch only, which limits applicability. 
 
 Also, the theory of adaptive HMC relies on assumptions about the HMC which is still not proven on general state spaces (e.g. uniform or geometric ergodicity).
 
@@ -519,8 +528,21 @@ Adaptive MCMC means varying the tuning parameters (stepsize, trajectory length)
 while sampling along the chain. Since all samples collected need to converge to
 the target distribution, the requirement is much more strict on the sampler.
 On the other hand, we can simply consider the sampler as a black-box and select
-tuning parameters as we would using bayesian optimization.
-\cite{snoek2012practical}.
+tuning parameters using bayesian optimization.\cite{snoek2012practical}.
+
+Compare different acquisition functions for choosing tuning parameters in MCMC
+algorithms, in batch and stochastic gradient settings. 
+Use acquisition functions in the Snoek paper, as well as expected squared jump
+distance.
+
+Can it beat grid search?
+Compare ESS/L. 
+
+\begin{algorithm}
+    \caption{Bayesian optimization}
+    \State
+    \State $p$ is the dimension
+\end{algorithm}
 \section{Bayesian Model Selection and Prediction}
 In a neural network model there are multiple hyperparameters left to be tuned be
 the user. These include the number of hidden layers, the number of hidden
@@ -631,16 +653,31 @@ Bayesian logistic regression with hierarchical prior. Following \cite{zhang2014s
 
 1. Sample weights with HMC, sample hyperparameter with Gibbs sampling.
 
-2. Sample weights and hyperparamter at the same time with RMHMC (soft-abs metric).
+2. Sample weights and hyperparamter at the same time with RMHMC  (soft-abs metric).
 
-3. Semi-separable Hamiltonian Monte Carlo
+3. Same as above except done with RMALA .
+4. Semi-separable Hamiltonian Monte Carlo
 
-4.   
+Compare ESS/L.
+Data: Same classification problem datasets from the RHMC paper \cite{girolami2011riemann}, as well as simulated data.
+Funnel problem
+Compare ESS/L as well as marginal distribution of the hyperparameter, which is known in this case. 
+
+Bayesian neural network of more than 2 hidden units and of 1 hidden layer only. Test 1 layer network of 100 units with fixed normal prior and hierarchical prior.
+Data: Same regression problem datasets from the PBP paper \cite{hernandez2015probabilistic}. 
+
+
+For all the above problems it is straight forward to adapt code to compare manual hyperaparameter tuning with automatic tuning by STAN and by bayesian optimization. Compare ESS/L results for the final parameters selected. 
+
 Test robustness of consensus mcmc to poor mixing. Split data into a $K$ subsets randomly, $K$ being a manageable small number (5 or 8), then tune some posterior distribution samplers to mix well and some others don't. Test on both regular and singular models.
  
 For neural networks being used to fit a small number of observations relative to its dimension, there is a problem of overfitting. In \cite{gal2015bayesian}, it was shown that approximate bayesian inference via dropout helps to mitigate this problem. We argue that MCMC sampling would achieve even better performance.
 
+Use only a small percentage (5 or 10 percent) of the MNIST dataset and perform batch inference with BNN. Try both fixed prior and hierarchical priors. Use the best sampler found from earlier experiments. 
+Compare with gradient descent and dropout. 
 
+Done with MCMC
+Bayesian model selection. 
 Bayesian neural networks can also be used to model data when the size of the training set is small. In this setting frequentist training of neural networks suffers from overfitting. Practioners who use neural network would like to make predictions for new data $\{x_{new}\}$. In principle, before making predictions the practioner should first decide on the model(s) to be used to fit the training data. While bayesian model averaging (BMA) is an interesting idea which promises to improve prediction accuracy, assignign prior to different models is difficult to justify and may appear arbritary. More importantly, for large models the time and memory complexity required to sample from the posterior distribution or the variational approximation thereof, as well as sample from the predictive distribution, would quickly become unmanageable as the number of models increases. 
 
 For this reason, model selection is usually carried out, where a model is selected and then trained to make predictions on new data. Because there are infinitely many combinations of different tuning parameters and model structure paramters, an exhaustive search is impossible and instead a heuristic combinations of tuning paramters are chosen to form the candidtate models. Usually a holdout set (test set) is used to estimate the predictive performance of the model on new data. The model with the lowest average predictive error is then chosen. 
@@ -665,6 +702,10 @@ in small-to-medium data size settings, where a randomly chosen subset that is 25
 percent the size of total dataset is unlikely to estimate the test error with a
 low variance (unbiased by highly variable).
 
+Approximation inference. 
+Compare PBP, BBB, LA, to HMC. Use fixed prior. 
+
+
 But before all this can start we first need to overcome the difficulties of
 sampling from the posterior distribution of a bayesian neural network. The
 first source of difficulty comes from the correlation in the posterior distribution induced by
@@ -678,6 +719,8 @@ log-posterior. The trade-off is now a linear system of full rank must be solved
 to calculate each update in the markov chain. This has the time complexity of
 $O(p^3)$ which makes it difficult to apply to neural network models, who's
 expressiveness comes from its large number of parameters. 
+
+Posterior correlation due to hierarchical prior vs inter-layer correlation. 
 
 The second source of difficulty comes from the cost of evaluating the
 log-posterior density and its derivative with respect to the parameters. For
