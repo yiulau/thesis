@@ -404,6 +404,18 @@ This estimator has lower variance than the naive alternative $\frac{1}{T} \sum_{
 
 The author proved that as the stepsizes $\epsilon_t$ goes to $0$ the samples $\{\theta_t\}$ converge tothe Langevin dynamics targeting the posterior distribution. Of course, in practice we set lower bound on $\epsilon_t$ and stop decreasing the stepsize once it is small enough. Also, the fact the we are not doing the acceptance-rejection step means there will be a bias in our posterior samples, which unlike the samples drawn from a Metropolis-Hastings sampler, does not decrese to $0$ as we sample from the chain longer.
 
+\begin{algorithm}
+    \caption{Stochastic Gradient Langevin Dynamics}
+    \comment{Input: N,n,\theta_0,\{\epsilon_t\}_{t=1}^T}
+    \State{Initialize $\theta_0$}
+    \For{t in 0:T}
+    \State Sample random subset $\{x_{ti}\}_{i=1}^n$
+    \State Sample $\eta_t \sim \mathcal{N}(0,\epsilon_t) $
+    \State{$\theta_{t+1} = \theta_{t} + \frac{\epsilon}{2}(\nabla \log
+    p(\theta_t) + \frac{N}{n} \sum_{i=1}^n \nabla \log
+    p(x_{ti}|\theta_t))+\eta_t$}
+    \EndFor
+\end{algorithm}
 Simulating from the discrete approximation to a Langevin dynamics is the basis
 for Langevin Monte Carlo or Metropolis adjusted Langevin Algorithm, which
 includes an acceptance-rejection step at each update. This can also be seen as a
@@ -413,19 +425,68 @@ walk. (Show $O(d^{4/3})$ vs $O(d^{5/4})$ kind of results). This inspires
 Stochastic Gradient Hamilotian Monte Carlo (SGHMC) \cite{chen2014stochastic},
 which extends HMC the way SGLD extends LMC. 
 
+\begin{algorithm}
+    \caption{Stochastic Gradient HMC}
+    \comment{Input: $\eta,\alpha,n,T,m,\theta_0$
+        \State{Initialize $\theta_0,v_0$}
+        \For{t = 1:T}
+        \State{$\theta^{0}=\theta_{t-1}$}
+        \State{$v^{0}=v_{t-1}$}
+        \For{i = 1:m}
+        \State{$\theta^{i} = \theta^{i-1} + v^{i-1}$}
+        \State{Sample $z \sim \mathcal{N}(0,2(\alpha-\hat{\beta} \eta)$}
+        \State{Sample minibatch and calculate $\nambla \tilde{U}(x)$ }
+        \State{$v^{i} = -\eta \nambla \tilde{U}(x) - \alpha v^{i-1} + z$}
+        \EndFor
+        \State{$\theta_t = \theta^{m}$}
+        \State{$\v_t = v^{m}$}
+        \EndFor
+\end{algorithm}
 Important points to retain: connection to sgd with momentum. dont know how to
 set $C$ matrix. noise of gradient $B$ not actually estimated in any of the
 examples in the paper claiming as stepsizes goes to zero the noise goes to zero
 as well. The estimation can be done using along diagonal approximation, or  
 low-rank approximations. 
 
+Preconditioned SGLD
+\begin{algorithm}
+    \caption{pSGLD}
+    \comment{Input $\{\eta_t\}_{t=1}^T , \lambda, \beta, \theta_0$}
+    \State{Initialize $v_0=0$}
+    \For{t in 1:T}
+    \State{$\tilde{f}_t = \nabla \tilde{U}_t(\theta)$}
+    \State{$v_t = \beta v_{t-1} + (1-\beta)\tilde{f}_t \odot \tilde{f}_t$}
+    \State{$G_t^{-1} = diag(1\oslash(\lambda 1 + v_t^{1/2}))$}
+    \State{$\psi_t \sim \mathcal{N}(0,\eta_t G_t^{-1})$ }
+    \State{$\theta_{t} = \theta_{t-1} + \frac{\eta_t}{2}G_t^{-1}\tilde{f}_t +
+\psi_t$}
+    \EndFor
+\end{algorithm}
 Sampling via Stochastic Gradient Fisher-Scoring (SGFS) was proposed in
 \cite{ahn2012bayesian}.
 
 
 Sampling via Stochastic Gradient thermostat. 
-
+\begin{algorithm}
+    \caption{SG Thermostat}
+    \comment{Input: $\eta,a,\theta_0$}
+    \State{Initialize $u_0 \sim \mathcal{N}(0,\eta I),\alpha_0=a$}
+    \For{t in 1:T}
+    \State{Evaluate $\nabla \tilde{U}(\theta_{t-1})$}
+    \State{$u_t = u_{t-1} - \alpha_{t-1} u_{t-1} - \nabla \tilde{U}(\theta_{t-1})\eta +
+    \mathcal{N}(0,2a\eta)$}
+    \State{$\theta_{t} = \theta_{t-1} + u_t$}
+    \State{$\alpha_{t} = \alpha_{t-1} + \frac{1}{n} u_t^Tu_t - \eta$}
+    \EndFor
+\end{algorithm}
 Sampling via pre-conditioned Stochastic Gradient langevin dynamics. 
+\begin{algorithm}
+    \caption{Preconditioned SGLD}
+    \comment{Inputs:$ \{\epsilon_t\}_{t=1}^T,\lambda,\alpha,T$}
+    \State{Initialize
+    \For{t in 1:T}
+
+\end{algorithm}
 
 Applying MCMC methods to large datasets often involve 2 problems. First, evaluating the unnormalized posterior density
 \[ p(D|\theta) = \prod_{i=1}^n p(x_i|\theta) \]
@@ -438,6 +499,45 @@ splitting the data points into subsets and sample from the respective posterior 
 
 First, we review the data subsampling approach. (Talk about Consensus MCMC). What happens when some subset servers mix poorly?     
 
+Let $\mathbf{x}$ be the full data of size $N$ and $\theta$ be the model
+parameters. Assuming independence of the data, for $S \le N$, the posterior distribution of
+$\theta$ can be written as 
+\[ p(\theta|\mathbf{x}) \propto \prod_{s=1}^S p(\mathbf{x}_s|\theta)
+p(\theta)^{1/S} \]
+where $\{\mathbf{x}_s\}_{s=1}^S$ is a disjoint partition of the original data.
+Technically, in this formulation, each subset can be of variable size. But for
+the purpose of computational efficiency we assume $|\mathbf{x}_s}|=\frac{N}{S}
+\forall s$. 
+
+Now, for each subset $\mathbf{x}_s$, we draw $G$ samples $\theta_{s1},\dots,
+\theta_{sG}$ from
+$p(\theta|\mathbf{x}_s) \propto p(\mathbf{y}_s|\theta)p(\theta)^{1/S}$. To
+combine these $S \times G$ samples we do 
+\[ \theta_g = (\sum_{s} W_s)^{-1} \sum_s W_s \theta_{sg} \]
+where $W_s$ is a weighting matrix. For models where the posterior distributions
+$p(\theta|\mathbf{x}_s)$ are Gaussian. $\sum_{s} =
+Var(\theta|\mathbf{x}_s)^{-1}$ is exact. By the bayesian central limit theorem,
+for regular models the normal approximation for the posterior distribution is
+arbitrarily good, so we can use the inverse of the empirical variance as $W_s$.
+There is no theoretical guarantee that normal approximation to the posterior
+distribution for neural network models is accurate. 
+
+For high dimensional $\theta$, we can ignore the correlations and use the
+marginal variances for $W_s$.
+
+This is a general methodology that can be coupled with any sampling methods, be
+it MCMC or exact sampling. 
+\begin{algorithm}
+    \caption{Consensus Monte Carlo}
+    \comment{Input: $S,G, \mathbf{x}$}
+    \State{Divide $\mathbf{x}$ into $S$ disjoint parts
+    $\{\mathbf{x}_s\}_{s=1}^S$}
+    \State{Draw samples $\theta_{sg} \sim p(\theta|\mathbf{x}_s) \propto
+    p(\mathbf{x}_s|\theta)p(\theta)^{1/S}$ for $g=1,\dots,G, s=1,\dots,S$}
+    \State Calculate $W_s$ for $s=1,\dots,S$.
+    \State Combine the draws for $g=1,\dots,G$:$ \theta_g = (\sum_{s=1}^S
+    W_s)^{-1}(\sum_s W_s \theta_{sg})$
+\end{algorithm}
 
 Scaling based on splitting techniques from Neal. Random data subset used to approximate the Hamiltonianduring leapfrog step but uses the full dataset for calculating the Hastings ratio. Retains convergence to invariant distribution. 
 
@@ -703,7 +803,24 @@ percent the size of total dataset is unlikely to estimate the test error with a
 low variance (unbiased by highly variable).
 
 Approximation inference. 
-Compare PBP, BBB, LA, to HMC. Use fixed prior. 
+Compare PBP, BBB, LA, to HMC and SGD. Use fixed prior. Test effect of small training
+set. Compare time to reach test accuracy. Use importance sampling to calculate
+WAIC. Decrease memory until these approximation methods perform better than
+MCMC.
+
+Scaling MCMC
+SGLD, SGHMC, pSGLD, SGFS, Thermostat. Compare test accuracy with batch HMC.
+Tuning by test accuracy, or tuning by ESJD.
+
+Consensus MCMC 
+See if singularity severely degrades quality of classification.
+
+Effects of pruning
+In the BBB paper, performance does not degrade drastically even if 98 percent of
+the weights are removed. See same thing applies to MCMC samples. 
+
+
+
 
 
 But before all this can start we first need to overcome the difficulties of
