@@ -18,7 +18,7 @@
 \chapter{Model}
 
 \section{Markov Chain Monte Carlo}
-T
+
 Starting from the beginning of research using MCMC techniques in statistical applications, there has been work \cite{geman1984stochastic,besag1986statistical} in the area of image analysis. Because of the high-dimensional nature of image datasets, initially only the Gibbs sampler were used, circumventing the well known slow-mixing/low-acceptance behaviour of the random-walk Metropolis-Hastings sampler in high dimension. The introduction of Hamiltonian Monte Carlo into the field of statistics by Neal \cite{neal2011mcmc,neal2012bayesian}, who built on the work of physicists using HMC to simulate from lattice field models \cite{duane1987hybrid}, brings an exciting new tool that allows statisicians to simulate much more efficiently from high-dimenisonal distributions. Unfortunately, because of the relative difficulty in implementing such samplers its use in statistics has been limited. In the last few years there has been a rebirth of the HMC sampler, with new developments thattry to utilize information about the local curvature of the density function during  sampling \cite{girolami2011riemann,betancourt2013general}, as well as to automate the selection of tuning parameters \cite{hoffman2014no,betancourt2016identifying}. 
 
 In this work, we seek to understand the behaviour of the HMC sampler when applied to multilayer neural network models grouped under the umbrella term of "deep learning"\cite{schmidhuber2015deep}. Previous work exists \cite{choo2000learning,neal2012bayesian} but they date from before the "deep learning revolution" of the mid 2000s, when training neural networks of more than one hidden layer proved to be feasible and yielded superior performance to one-hidden-layered models.  
@@ -311,7 +311,13 @@ $k$ is set to a small number like $5$ or $6$.
 
 The choice of $G(\theta)$ can be very general. Techincally it gives the correct invariant distribution as long as it remains positive definite.
 
-In the examples given in the JRSS-B paper, the metric tensor chosen was the expected fisher information matrix, which has theoretical justification form information theory. It is recommeneded that the observed Fisher information be used when the expected value can't be calculated analytically, which is the case for practically all neural networks, except trivial cases.
+In the examples given in the JRSS-B paper, the metric tensor chosen was the
+expected fisher information matrix, which has theoretical justification form
+information theory. It is recommeneded that the observed Fisher information be
+used when the expected value can't be calculated analytically, which is the case
+for practically all neural networks, except trivial cases. In those cases, we
+can modify the Empirical FIM to make it PD, by adding a constant multiple of the
+identity matrix, for example. 
 
 In Betancourt's paper, he demonstrated the effectiveness of the softabs metric in sampling from hierarchical models, which motivates us to test it with neural network models. 
 
@@ -321,7 +327,8 @@ Let the SoftAbs map be
 Then the proposed metric is $SA(H)$,where $H$ is the Hessian matrix taken with respect to the potential energy function, equivalent to the negative log posterior density in this case.
 
 There are lots of implementation details that we can find in
-\cite{betancourt2013general}.
+\cite{betancourt2013general}. Notably, the 3rd order partial derivatives of the
+posterior density need to be calculated. 
 
 This sampler is reminescent of second order methods in optimization. The move
 from using only information about the gradient to the Hessian is like
@@ -337,6 +344,57 @@ To quote MALA, \cite{roberts2002langevin}
 \item Softabs metric 
 There is an easily implemented extension to the original HMC which does some tempering to help sampling from multi-modal distribution.
 
+Semi-separable HMC has limited applicability because it still requires inverting
+a Fisher information matrix, which may be singular for neural network models.
+Likely to depend heavily on the choice of mass matrices.
+
+Let $\theta$ be the model parameter and $\phi$ the hyperparameter such that
+the distribution of $\theta$ is parameterized by $\phi$. Following the HMC
+methodology, we introduce corresponding auxillary variables $r_\theta$ and
+$r_\phi$. 
+In the HMC methodology following Neal's introduction. The auxillary variables
+are modeled to have Gaussian distribution marginally, with a diagonal precision
+matrix to be tuned manually. In RMHMC this is assumed to be the expected Fisher
+information matrix. Importantly, the precision matrices $G_\theta(\theta)$,
+$G_\phi(\phi)$
+are dependent on the varaibles they are modeling. In semi-separable Hamiltonian
+Monte Carlo (SSHMC), the precision matrix has the form
+\[ G(\theta,\phi) = 
+    \begin{align}
+    &G_\theta(\phi,x) & 0 \\
+    &0 &G_\phi(\theta)
+    \end{align}
+\]
+While giving up information about the local curvature of $\theta$, this modeling
+assumption can deal with the correlation between the parameters and
+the hyperparameters, which gives enough improvement in mixing speed to yield
+better performance for hierarchical models, as shown in the paper by Zhang and
+Sutton. 
+
+The Hamiltonian 
+\[H(\theta,\phi,r_\theta,r_\phi) = U(\theta,\phi) + K(r_\theta,
+r_\phi|\theta,\phi)\] can then be rewritten as the sum of two Hamiltonians 
+\[H = H_1(\theta,r_\theta) + H_2(\phi,r_\phi) \]
+
+Even though the original Hamiltonian $H$ is not separable, the two Hamiltonians that
+sum to $H$ are separable when looked at separately. This enables the simple
+leapfrog to be used instead of the more time consuming generalized leapfrog.
+
+\begin{algorithm}
+    \caption{SSHMC}
+    \comment{Input:$L,\epsilon,\theta_0,\phi_0$}
+    \State{Initialize $r \sim \mathcal{N}(0,G_\theta(\phi,x))$ and $r_\phi \sim
+    \mathcal{N}(0,G_\phi(\theta))$}
+    \For{$\ell$ in $1,2, \dots, L$}
+    \State{$(\theta^{\ell + \epsilon/2},r^{\ell + \epsilon/2}) =
+    leapfrog(\theta^{\ell},r_\theta^{\ell}, H_1,\epsilon/2)$}
+    \State{$(\phi^{\ell + \epsilon/2},r^{\ell + \epsilon/2}) =
+    leapfrog(\phi^{\ell},r_\theta^{\ell}, H_2,\epsilon)$}
+    \State{$(\theta^{\ell + \epsilon},r^{\ell + \epsilon}) =
+    leapfrog(\theta^{\ell + \epsilon/2},r_\theta^{\ell +\epsilon/2}, H_1,\epsilon/2)$}
+    \State{Acceptance-Rejection Step}
+    \EndFor
+\end{algorithm}
 \section{approximate inference for fast training and prediction}
 
 Because of the challenges of MCMC sampling from the posterior distribution of
@@ -753,11 +811,15 @@ Bayesian logistic regression with hierarchical prior. Following \cite{zhang2014s
 
 1. Sample weights with HMC, sample hyperparameter with Gibbs sampling.
 
-2. Sample weights and hyperparamter at the same time with RMHMC  (soft-abs metric).
+2. Same as above with Windowed update.
 
-3. Same as above except done with RMALA .
-4. Semi-separable Hamiltonian Monte Carlo
+3. Same as 1 but with tempering. 
 
+4. Sample weights and hyperparameter together with HMC. (STAN)
+
+5. Softabs 
+
+6. Empirical fisher information matrix 
 Compare ESS/L.
 Data: Same classification problem datasets from the RHMC paper \cite{girolami2011riemann}, as well as simulated data.
 Funnel problem
