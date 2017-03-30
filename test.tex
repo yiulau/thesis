@@ -21,7 +21,16 @@
 
 Starting from the beginning of research using MCMC techniques in statistical applications, there has been work \cite{geman1984stochastic,besag1986statistical} in the area of image analysis. Because of the high-dimensional nature of image datasets, initially only the Gibbs sampler were used, circumventing the well known slow-mixing/low-acceptance behaviour of the random-walk Metropolis-Hastings sampler in high dimension. The introduction of Hamiltonian Monte Carlo into the field of statistics by Neal \cite{neal2011mcmc,neal2012bayesian}, who built on the work of physicists using HMC to simulate from lattice field models \cite{duane1987hybrid}, brings an exciting new tool that allows statisicians to simulate much more efficiently from high-dimenisonal distributions. Unfortunately, because of the relative difficulty in implementing such samplers its use in statistics has been limited. In the last few years there has been a rebirth of the HMC sampler, with new developments thattry to utilize information about the local curvature of the density function during  sampling \cite{girolami2011riemann,betancourt2013general}, as well as to automate the selection of tuning parameters \cite{hoffman2014no,betancourt2016identifying}. 
 
-In this work, we seek to understand the behaviour of the HMC sampler when applied to multilayer neural network models grouped under the umbrella term of "deep learning"\cite{schmidhuber2015deep}. Previous work exists \cite{choo2000learning,neal2012bayesian} but they date from before the "deep learning revolution" of the mid 2000s, when training neural networks of more than one hidden layer proved to be feasible and yielded superior performance to one-hidden-layered models.  
+In this work, we seek to understand the behaviour of the HMC sampler when
+applied to multilayer neural network models grouped under the umbrella term of
+"deep learning"\cite{schmidhuber2015deep}. Previous work exists
+\cite{choo2000learning,neal2012bayesian} but they date from before the "deep
+learning revolution" of the mid 2000s, when training neural networks of more
+than one hidden layer proved to be feasible and yielded superior performance to
+one-hidden-layered models. Also, those works rely heavily on manual tuning,
+assume small datasets and do not have access to parallel computing, all of which
+make the methodology lacking for dealing with the type of tasks present in deep
+learning presently.
 
 \cite{green2015bayesian} gives a good summary of dynamical MCMC methods (langevin diffusion,MALA,HMC) and related convergence assessment methodologies.
 
@@ -39,7 +48,6 @@ Examples: MAP, marginal posterior, credible interval. The exact calculation of t
 
 See more about Bayesian data analysis in \cite{gelman2014bayesian}. 
 
-Things to talk about 
 The Metropolis-Hastings sampler.
 
 Suppose we have a an unnormalized density $p(x)$, and $q(x,y)$ is a proposal function such that conditional on the current state $x$, the probability of moving from $x$ to a measurable set $A$ is denoted by $q(x,A)$, we can calculate the Hastings ratio
@@ -48,6 +56,16 @@ Suppose we have a an unnormalized density $p(x)$, and $q(x,y)$ is a proposal fun
 Then we accept the move to state $y$ with probability $ \min (1, r(x,y)) $, and stay in the current state otherwise.
 
 The acceptance probability can be optimized, as shown in \cite{roberts1997weak,gelman1996efficient,roberts2001optimal}. In the case of a target distribution with zero correlation between components and using a symmetric gaussian proposal, the optimal acceptance rate is 0.234. Optimal scaling can also be derived for the langevin sampler \cite{roberts1998optimal}.
+
+Very much like optimization \cite{wright1999numerical}, for differentiable density
+functions, information about the gradient can be useful for proposing the next
+state. It inspires the Langevin diffusion \cite{}, which is a stochastic process
+defined by a stochastic differential equation with the posterior distribution as
+its stationary distribution. It can only be implemented by discretization, which
+introduces some bias into the samples drawn. To offset this, a Metropolis
+acceptance step is introduced and this gives the Metropolis Adjusted Langevin
+Algorithm. 
+
 
 \begin{algorithm}
 \caption{Metropolis-Adjusted Langevin Algorithm}
@@ -92,12 +110,22 @@ Effective sample size is defined as
 estimated by the initial
 monotone sequence estimator \cite{geyer1992practical}
 
-It is a useful metric for measuring quality of the samples obtained from a Markov Chain. We can take the mean or min ESS across alll covariates.
+It is a useful metric for measuring quality of the samples obtained from a
+Markov Chain. We can take the mean or minimum ESS across all covariates.
 
 Convergence diagnostics for high-dimensional target distributions. Theoretically, need convergence of the Markov Chain to the joint distribution, in practice only convergence to marginal distributions are checked. The literature has only looked at applying univariate diagnostics to each parameter individually and then calculate some summary statistic (mean,min) or carry out multiple testing if the diagnostic is based on a hypothesis test.
 
 KL-divergence can be used to compare samples drawn from two different samplers.
 The method advanced in \cite{boltz2007knn,boltz2007high} uses a kernel estimator to estimate the KL divergence between two empiricial distributions. The curse of dimensionality makes it difficult for application to high-dimensional posterior distributions $p(\theta|x)$, however, we can apply it to marginal predictive distributions $p(y|D)$ which usually are low-dimensional, when the covariates $x$ are fixed.
+
+Tune MCMC algorithms. MCMC algorithms usually have a small number of tuning
+parameters, such as a stepsize $\epsilon$, the number of leapfrog steps, or more
+basic quantities like the length of the chain. Classic Bayesian methodology
+\cite{robert2013monte} uses a mix of visual inspection of trace plots and
+numerical convergence diagnostics like ESS as discussed earlier. The process
+requires human intervention each time an algorithm is run and tuning parameters
+readjusted after the diagnostics are computed. 
+
 
 \item Hamiltonian Monte Carlo. Theory(detailed balance, geometry, leapfrog integrator, symplecticity) and how to tune it(optimal accpetance probability). No U-Turn sampler and STAN. 
 
