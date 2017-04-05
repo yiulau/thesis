@@ -135,30 +135,47 @@ Suppose we have a density $p(x),x \in \mathcal{R}^d$ from which we would like to
 
 The Metropolis-Hastings sampler is a general algorithm that allows us to sample from any distribution, discrete, continuous or neither, as long as we know its density up to normality. The Hamiltonian Monte Carlo (HMC) sampler restricts the generality by requiring that the unnormalized density be continuous and differentiable. 
 
-Following the notation in the literature, we denote the unnormalized density of the target distribution by $P(q)$, and the normalizing constant by $Z = \int P(q)dq $, and we define the potential energy function $U(q)$ as 
-\[ U(q) =  \exp(-\log(P(q))) \]
-If we now introduce a kinetic energy function $K(p)$, and define
-the Hamiltonian as the total energy in the system 
+We denote the unnormalized density of the target distribution by $P(x)$, and the normalizing constant by $Z = \int P(x)dx $, and we define the potential energy function $U(x)$ as 
+\[ U(x) =  \exp(-\log(P(x))) \]
+If we now introduce a kinetic energy function $K(y)$, and define
+the Hamiltonian as the sum of the kinetic and potential energy functions 
 
-\[ H(p,q) = U(q) + K(p) \]
+\[ H(x,y) = U(x) + K(y) \]
 
 we get that 
 
-\[P(q,p) \propto  \exp(-H(p,q)) \]
+\[P(x,y) \propto  \exp(-H(x,y)) \]
 
-has $P(q)$ as the marginal density, and thus defines an auxilary variable method. Note that there is physical interpretation of the system. The Hamiltonian uniquely determines the motion of a particle, whose position in space at any time is described by the $q$ coordinates, and whose momentum is described by the $p$ coordinates.
+has $P(x)$ as the marginal density, and thus defines an auxilary variable method. Note that there is physical interpretation of the system. The Hamiltonian uniquely determines the motion of a particle, whose position in space at any time is described by the $x$ coordinates, and whose momentum is described by the $y$ coordinates.
 
-In statistical applications,we usually have $P(q)$ as the unnormalized posterior
+In statistical applications,we usually have $P(x)$ as the unnormalized posterior
 density, 
-\[U(q) = -\log(\mathtext{prior}(q) \cdot \mathtext{likelihood}(q|data) ), \]
+\[U(q) = -\log(\mathtext{prior}(x) \cdot \mathtext{likelihood}(x|data) ), \]
 and 
-\[K(p) = \sum_{i=1}^d \frac{pi^2}{m_i} \]
+\[K(y) = \sum_{i=1}^d \frac{y_i^2}{m_i} \]
 ,which is equivalent to introducing an independent multivariate Gaussian random variable of
 the same dimension as the original distribution as an auxilary variable. 
 
+Harking back to earlier analogy to a physical system, the motion of a particle
+under Hamiltonian dynamics is described by a system of partial differential
+equations known as Hamilton's equations:
+$
+\begin{align}
+    \frac{dx}{dt} = \frac{\partial H}{\partial y }
+    \frac{dy}{dt} = -\frac{\partial H}{\partial x}
+\end{align}
+$
+
+To simulate the trajectory of a particle given its initial state $(x_0,y_0)$ one
+would have to discretize the Hamiltonian dynamics. The discretization should
+ideally have some nice properties that includes volume-preservation, to maintain
+stability and accuracy of the approximation over long trajectories. This leads
+to the leapfrog integrator which is described below. 
+
+Now, we describe a simple version of the HMC sampler.
 The sampler starts by drawing from the conditional (marginal because of
-independence) distribution of the momentum variables $q$, then it simulates the
-movement of a particle having initial position and momentum $(p,q)$ according to
+independence) distribution of the momentum/auxillary variables $y$, then it simulates the
+movement of a particle having initial position and momentum $(x,y)$ according to
 Hamiltonian dynamics. More precisely, we do $L$ leapfrog steps of stepsize
 $\epsilon$, both of which are important tuning parameters to the algorithm.
 
@@ -176,7 +193,7 @@ following $L$ times
     q}(q(t+\epsilon))
 \end{align}
 At the end of the trajectory we get $(q(t+L \epsilon),p(t+L \epsilon)) =
-(\tilde{q}, \tilde{p})$, which becomes the proposed next state for the chainand
+(\tilde{q}, \tilde{p})$, which becomes the proposed next state for the chain and
 is used in the calculation of the Hastings ratio.
 
 The selection of $M$ so that the momentum varibles are distributed according to
@@ -185,6 +202,29 @@ Hamiltonian function remains constant in its trajectory after the initial
 position and momentum is fixed, the only change in the value of the probabiltiy
 density function comes from the initial resampling of the momentim variables $p$
 from its marginal distribution.
+
+Here we state some facts about Hamiltonian dynamics that would help us
+understand why proposals generated from simulation of Hamiltonian dynamics would
+form a Markov Chain sampler that has the right invariant properties. 
+
+First, the Hamiltonian flow, i.e. the mapping implied by the Hamiltonian
+dynamics, is reversible. That is, any mapping $T_s(x(t),y(t)) =(x(t+s),y(t+s)) $
+is bijective and has an inverse $T_{-s}$. Intuitively, it says that any particle
+whose trajectory follows Hamiltonian dynamics can be returned to its initial
+state $(x_0,y_0)$ from current state $(x_t,y_t)$ by reversing the sign of $y_t$
+and having the particle follow its tracjetory for time $t$. Reversibilty is one
+of the sufficient conditons for Markov Chains to have the right invariant and
+convergence properties \cite{robert2013monte}. 
+
+Second, the Hamiltonian flow $T_s$ is a volume-preserving mapping. It makes it
+possible to calculate the Hastings ratio without involving the determinant of
+the Jacobian matrix of the mapping $T_s$ , which might be tricky for most
+mappings. For Hamiltonian flows the determinant is just one.
+Third, the Hamiltonian is constant with respect to time, i.e., $\frac{dH}{dt} =
+0$. From the physics point of view, this is simply the conservation of energy in
+a closed system. It keeps acceptance probability high if the discrete simulation
+of the Hamiltonian dynamics is accurate enough.
+
 
 Another important trick in speeding up Hamiltonian Monte Carlo is Neal's window
 method \cite{neal1992improved}. 
