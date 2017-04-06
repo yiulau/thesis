@@ -157,7 +157,7 @@ and
 the same dimension as the original distribution as an auxilary variable. 
 
 Harking back to earlier analogy to a physical system, the motion of a particle
-under Hamiltonian dynamics is described by a system of partial differential
+under Hamiltonian dynamics is described by a system of ordinary differential
 equations known as Hamilton's equations:
 $
 \begin{align}
@@ -225,7 +225,36 @@ Third, the Hamiltonian is constant with respect to time, i.e., $\frac{dH}{dt} =
 a closed system. It keeps acceptance probability high if the discrete simulation
 of the Hamiltonian dynamics is accurate enough.
 
+From the theory of auxillary variable sampling we see that there are infinitely
+many marginal distributions for the momentum variable $y$ that would give the
+same target marginal distribution for the original parameter $x$. For example,
+if we restrict 
+\[ y \sim \mathcal{N}(0,M) \]
+where $M$ is positive definite then any choice of $M$ on the support gives a
+different kinetic energy and, by extension, Hamiltonian functions. In the HMC
+literature, the focus has been on Gaussian kinetic energies, even though it is only
+supported by empirical evidence and intuition appealing to the central limit
+theorem. This is one of the two important tuning parameters of the sampler. Its
+selection has mainly to do with decorrelating the irregular geometry of the
+target distribution. For example, if we would like to sample from a multivariate
+Gaussian distribution with highly skewed covariance, one could adopt a mass
+matrix $M$ for the kinetic energy correspondingly and sampling can be shownto be
+equivalent to sampling from a standard Gaussian with identity covariance in a
+linearly transformed parameter space. (Talk about linear transformation)
 
+When the target distribution has more complicated geometry which might differ in
+curvature in various parts of its support, a constant $M$ is not enough to ensure
+effective decorrelation during sampling. This motivates the use of
+a location-dependent mass matrix $M(x)$ and is called the Riemannian Hamiltonian
+Monte Carlo. More on this later. 
+
+The other important tuning parameter is the integration time. Theoretically this
+is the amount of time we decide to simulate the trajectory in the augmented
+space $(x,y)$ before projecting back to the sample space $(x)$. In any
+numerical implementation this is subsumed in the product of the stepsize and the
+number of leapfrog steps $\epsilon L$. It influences mainly the exploration of
+the augmented space, where a trajectory is simulated along the level set
+$\{(x,y):H(x,y)=E\}$. 
 Another important trick in speeding up Hamiltonian Monte Carlo is Neal's window
 method \cite{neal1992improved}. 
 
