@@ -242,6 +242,36 @@ matrix $M$ for the kinetic energy correspondingly and sampling can be shownto be
 equivalent to sampling from a standard Gaussian with identity covariance in a
 linearly transformed parameter space. (Talk about linear transformation)
 
+To see this, let $x' = Ax$, where $A$ is a invertible matrix. If we also
+transform the momentum variables $y' = (A^T)^{-1}y$ ,then the
+Hamilton's equations for the transformed variables $(x',y')$ will be the same as
+the original variables $(x,y)$. This also implies that HMC is rotationally
+invariant. 
+
+Suppose we want to sample from $x \sim \mathcal{N}(0,\Sigma)$. If let $y \sim
+\mathcal{N}(0,\Sigma^{-1})$, then the updates would be equivalent to using an
+identity covariance for $y$ for drawing from a standard multivariate Gaussian
+distribution. This setting is ideal for sampling efficiency because the
+covariates are indepenent and the standard deviations for the $x$ variables and
+that for the $y$ variables are on the scale. This is exactly the
+reparametrization trick for improving mixing in general MCMC methodology.
+
+There are several reasons why HMC is better than random-walk Metropolis. First,
+it avoids random walks. Random walks are inefficient because successive
+proposals might double back to previous positions, thus limiting the range of
+the exploration of the support, whereas Hamiltonian trajectories would be in the
+same direction for many steps. Second, it is much more efficient in
+high-dimensional settings. Because RW Metropolis randomly proposes changes in
+the $2^p$ possible directions, it becomes exponentially more difficult to move
+to an area of the support where there is significant mass. The acceptance
+probability would be extremely low and the chain becomes stuck. On the other
+hand, because HMC uses information of the gradient and an auxillary variable
+tuned to the curvature of the target distribution, the exploration stays close
+to the mode and the high density neighbourhood around it. The gradient draws the
+trajectory to
+the mode while the momentum variable keeps it from getting stuck there.
+
+
 When the target distribution has more complicated geometry which might differ in
 curvature in various parts of its support, a constant $M$ is not enough to ensure
 effective decorrelation during sampling. This motivates the use of
@@ -254,7 +284,9 @@ space $(x,y)$ before projecting back to the sample space $(x)$. In any
 numerical implementation this is subsumed in the product of the stepsize and the
 number of leapfrog steps $\epsilon L$. It influences mainly the exploration of
 the augmented space, where a trajectory is simulated along the level set
-$\{(x,y):H(x,y)=E\}$. 
+$\{(x,y):H(x,y)=E\}$.
+
+
 Another important trick in speeding up Hamiltonian Monte Carlo is Neal's window
 method \cite{neal1992improved}. 
 
