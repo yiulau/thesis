@@ -127,13 +127,25 @@ requires human intervention each time an algorithm is run and tuning parameters
 readjusted after the diagnostics are computed. 
 
 
-\item Hamiltonian Monte Carlo. Theory(detailed balance, geometry, leapfrog integrator, symplecticity) and how to tune it(optimal accpetance probability). No U-Turn sampler and STAN. 
+\section{ Hamiltonian Monte Carlo }. 
 
-Auxillary variable methods. 
-x
-Suppose we have a density $p(x),x \in \mathcal{R}^d$ from which we would like to sample. If $p(x)$ is simply the marginal density of some distribution $p(x,y), (x,y) \in \mathcal{R}^{d+p}$ in a larger space containing the original domain, then sampling from $p(x,y)$ and keeping only the $x$'s is equivalent to sampling from $p(x)$ directly. These extra variables introduced are called auxillary variables. The auxillary variables method are known to speed up sampling by introducing extra degrees of freedom in the state space and allows the chain to move more easily across different parts of it. The Swendsen-Wang sampler \cite{wang1990cluster}, the slice sampler\cite{wang1990cluster} are well known examples of this class of methods. See \cite{liang2011advanced,liu2008monte} for more details.
+Originally developed in the physics community \cite{duane1987hybrid},
+Hamilotnian Monte Carlo was introduced to the statistics community by Neal
+\cite{neal2012bayesian}, 
+by way of Computer Science, through his work on inference for Bayesian neural
+networks. It was shown to be very efficient in sampling from high-dimensional
+distributions and was used in bayesian inference to achieve superior predictive
+performance in machine learning tasks\cite{guyon2004result}. However, its sensitivity to tuning parameters, relative difficulty of
+implementation, and a lack of accessible
+exposition to its theory, itself a subject of open research, precludes
+widespread adoption. While some of these challenges remain to this day, the development of STAN \cite{carpenter2016stan} has made it significantly easier to carry out Bayesian inference with HMC, and is the main reason for increasing adoption of HMC in applications (cite statistics). Meanwhile, the invention Riemmanian Manifold Hamiltonian Monte Carlo (RMHMC) \cite{girolami2011riemann}, which exploits differential geometry to aid in local adaptation of the HMC sampler, and subsequent exploration the ideas introducd in the their paper, lead to better understanding of the mathematics behind HMC \cite{livingstone2016geometric,betancourt2014geometric} and  improvements to the sampler \cite{betancourt2013generalizing,betancourt2013general}. Many of these new developments have been and will be included in the STAN language. STAN also eliminates the need for tuning HMC. Users of STAN are shielded from the implementation details and tuning parameters settings, required only to specifiy the distributions involved in the  models. 
 
-The Metropolis-Hastings sampler is a general algorithm that allows us to sample from any distribution, discrete, continuous or neither, as long as we know its density up to normality. The Hamiltonian Monte Carlo (HMC) sampler restricts the generality by requiring that the unnormalized density be continuous and differentiable. 
+Since STAN is so central to the present HMC literature, we would explain how it functions in the following exposition. Before that, however, we would explain the basic version of HMC on which STAN is built and to which many extensions are added. 
+
+
+Suppose we have a density $p(x),x \in \mathcal{R}^d$ from which we would like to sample. If $p(x)$ is simply the marginal density of some distribution $p(x,y), (x,y) \in \mathcal{R}^{d+p}$ in a larger space containing the original domain, then sampling from $p(x,y)$ and keeping only the $x$'s is equivalent to sampling from $p(x)$ directly. These extra variables introduced are called auxillary variables. The auxillary variables methods are known to speed up sampling by introducing extra degrees of freedom in the state space and allows the chain to move more easily across different parts of it. The Swendsen-Wang sampler \cite{wang1990cluster}, the slice sampler\cite{wang1990cluster} are well known examples of this class of methods. See \cite{liang2011advanced,liu2008monte} for more details.
+
+The Metropolis-Hastings sampler is a general algorithm that allows us to sample from any distribution, discrete, continuous or neither, as long as we know its density up to normality. The Hamiltonian Monte Carlo (HMC) sampler is less general in that it requires the unnormalized density be continuous and differentiable. 
 
 We denote the unnormalized density of the target distribution by $P(x)$, and the normalizing constant by $Z = \int P(x)dx $, and we define the potential energy function $U(x)$ as 
 \[ U(x) =  \exp(-\log(P(x))) \]
@@ -146,9 +158,7 @@ we get that
 
 \[P(x,y) \propto  \exp(-H(x,y)) \]
 
-has $P(x)$ as the marginal density, and thus defines an auxilary variable method. Note that there is physical interpretation of the system. The Hamiltonian uniquely determines the motion of a particle, whose position in space at any time is described by the $x$ coordinates, and whose momentum is described by the $y$ coordinates.
-
-In statistical applications,we usually have $P(x)$ as the unnormalized posterior
+has $P(x)$ as the marginal density, and thus defines an auxilary variable method. In statistical applications,we usually have $P(x)$ as the unnormalized posterior
 density, 
 \[U(q) = -\log(\mathtext{prior}(x) \cdot \mathtext{likelihood}(x|data) ), \]
 and 
@@ -156,9 +166,7 @@ and
 ,which is equivalent to introducing an independent multivariate Gaussian random variable of
 the same dimension as the original distribution as an auxilary variable. 
 
-Harking back to earlier analogy to a physical system, the motion of a particle
-under Hamiltonian dynamics is described by a system of ordinary differential
-equations known as Hamilton's equations:
+Note that there is physical interpretation of the system. The Hamiltonian uniquely determines the motion of a particle, whose position in space at any time is described by the $x$ coordinates, and whose momentum is described by the $y$ coordinates. Its motion can be described by solving a system of ordinary differnetial equations in Hamiltonain dynamics, known as Hamilton's equations:
 $
 \begin{align}
     \frac{dx}{dt} = \frac{\partial H}{\partial y }
@@ -169,32 +177,28 @@ $
 To simulate the trajectory of a particle given its initial state $(x_0,y_0)$ one
 would have to discretize the Hamiltonian dynamics. The discretization should
 ideally have some nice properties that includes volume-preservation, to maintain
-stability and accuracy of the approximation over long trajectories. This leads
-to the leapfrog integrator which is described below. 
+stability and accuracy of the approximation over long trajectories. For the simple version of HMC where the momentum variable is independent from the position variable, i.e. $p(y|x)=p(y)$, an easy-to-implement integrator, known as the leapforg integrator, exists and works as follows. At time $t$ of the trajectory, given its current position and momentum, $q(t)$ and $p(t)$,and stepsize $\epsilon$, we would update the position and momentum at time $t+\epsilon$ by setting 
+\begin{align}
+    &p(t+\frac{\epsilon}{2}) = p(t) - \frac{\epsilon}{2}\cdot \frac{\partial
+    U}{\partial
+    q}q(t) \\
+    &q(t+\epsilon) = q(t) + \epsilon  \frac{\partial K}{\partial p}(p(t+\epsilon/2))
+    \\
+    &p(t+\epsilon) = p(t + \frac{\epsilon}{2}) - \frac{\epsilon} {2} \cdot \frac{\partial U}{\partial
+    q}(q(t+\epsilon))
+\end{align}
 
+Starting at some initial time $t_0$, with initial coordinates $(q(t_0),p(t_0))$, the position and momentum at time $t+s$ can be determined by repeating the steps above roughly $\frac{s}{\epsilon} = L$ times, taking care to round up or down. The advantage of the leapfrog integrator over other more well-known methods for solving ODE numerically such as Euler's method is that it is symplectic, which means it preserves volume in the phase space, just like the Hamilonian. However, it does not preserve the Hamiltonian, so the energy of the particle would oscillate as it is being simulated. It has important implications for the sampling algorithm. Intuitively, this breaks the law of conservation of energy and suggests the position of the particle at the end of its trajectory may deviate from the correct trajectory, on which the energy should be preserved. Reducing the stepsize would mitigate the problem but it comes with increased computational costs.  
+ 
 Now, we describe a simple version of the HMC sampler.
 The sampler starts by drawing from the conditional (marginal because of
 independence) distribution of the momentum/auxillary variables $y$, then it simulates the
 movement of a particle having initial position and momentum $(x,y)$ according to
 Hamiltonian dynamics. More precisely, we do $L$ leapfrog steps of stepsize
 $\epsilon$, both of which are important tuning parameters to the algorithm.
-
-The original leapfrog method is as follows. Suppose we start with $(p(t),q(t))$.
-Then to simulate the $L$ leapfrog steps of stepsize $\epislon$, we repeat the
-following $L$ times
-
-\begin{align}
-    p(t+\frac{\epsilon}{2} = p(t) - (\frac{\epsilon}{2}) \frac{\partial
-    U}{\partial
-    q}q(t) \\
-    q(t+\epsilon) = q(t) + \epsilon  \frac{\partial K}{\partial p}(p(t+\epsilon/2))
-    \\
-    p(t+\epsilon) = p(t + \epsilon/2) - (\epsilon /2) \frac{\partial U}{\partial
-    q}(q(t+\epsilon))
-\end{align}
 At the end of the trajectory we get $(q(t+L \epsilon),p(t+L \epsilon)) =
-(\tilde{q}, \tilde{p})$, which becomes the proposed next state for the chain and
-is used in the calculation of the Hastings ratio.
+(\tilde{q}, \tilde{p})$, which becomes the proposed state for the chain and
+is used in the calculation of the Hastings ratio. The proposed state is then accepted with probability $\min (1, \exp(H(t+L\epsilon0)-H(t)))$. 
 
 The selection of $M$ so that the momentum varibles are distributed according to
 a multivariate normal $\mathcal{N}(0, M)$ is crucial as well. Because the
@@ -260,7 +264,17 @@ There are several reasons why HMC is better than random-walk Metropolis. First,
 it avoids random walks. Random walks are inefficient because successive
 proposals might double back to previous positions, thus limiting the range of
 the exploration of the support, whereas Hamiltonian trajectories would be in the
-same direction for many steps. Second, it is much more efficient in
+same direction for many steps. Assuming independence, $n$ steps of random walk
+would result in a random displacement of $R$ units. Its variance  
+\[Var(R) = Var(R_1 + \dots + R_n) = Var(R_1) + \dots Var(R_n) = O(n) \]
+is a linear function of $n$. Its standard deviation is $O(\sqrt{n})$, and can be
+interpreted as the typical distance a random walk moves. As an analogy, if we
+have a 1-dimensional random walk $e_i \sim \mathcal{N}(0,\sigma^2)$ starting from
+the origin, then,  with high probability the particle is likely to end up in the
+interval $(-\sqrt{\sigma},\sqrt{\sigma})$. 
+On the otherhand, since leapfrog steps are deterministic given initial position
+and momentum, the distance moved will be proportional to $n$. 
+Second, HMC is much more efficient in
 high-dimensional settings. Because RW Metropolis randomly proposes changes in
 the $2^p$ possible directions, it becomes exponentially more difficult to move
 to an area of the support where there is significant mass. The acceptance
