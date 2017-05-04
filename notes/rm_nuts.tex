@@ -1,0 +1,34 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,fullpage,amsfonts,amssymb,tikz,geometry,amsthm,pgfplots,algorithm,algpseudocode,algorithmic}
+\geometry{margin=0.5in}
+\usetikzlibrary{matrix}
+\pgfplotsset{soldot/.style={color=blue,only marks,mark=*}}
+\pgfplotsset{holdot/.style={color=blue,fill=white,only marks,mark=*}}
+\usepackage{hyperref}
+\usepackage{setspace}
+\doublespacing
+\title{Pseudocode for NUTS for RMHMC}
+\begin{document}
+\maketitle
+\begin{algorithm}
+\caption{NUTS termination criterion for RMHMC(softabs)}
+\Comment{Input: $p_{t_1},\dots,p_{t_L}$, where $p_{t_1}$ and $p_{t_L}$ are the
+momenta evaluated at the two ends of a trajectory of length $L$, also a subtree in the balanced binary
+tree in the multiplicative scheme. $\Lambda(t_1),\Lambda(t_L)$, where
+$\Lambda(\cdot)$ is the inverse of the softabs map of the Hessian evaluated at
+that point. }
+\Function{Termination}{$p,\Lambda$}
+\State $\rho = \frac{1}{\sum_k \delta t_k}\sum_{i=1}^L p(t_i)$
+\State $T_1 = Indicator(p(t_L)^T \Lambda(t_L) \rho < 0 )$
+\State $T_2 = Indicator(-p(t_1)^T \Lambda(t_1) \rho < 0 )$
+\If{$T_1 = TRUE $ and  $ T_2 = TRUE$}
+\State {\Return $TRUE$}
+\Else{}
+\State {\Return $FALSE$}
+\EndIf
+\Endfunction
+\end{algorithm}
+
+
+\end{document}

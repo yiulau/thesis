@@ -138,19 +138,21 @@ distributions and was used in bayesian inference to achieve superior predictive
 performance in machine learning tasks\cite{guyon2004result}. However, its sensitivity to tuning parameters, relative difficulty of
 implementation, and a lack of accessible
 exposition to its theory, itself a subject of open research, precludes
-widespread adoption. While some of these challenges remain to this day, the development of STAN \cite{carpenter2016stan} has made it significantly easier to carry out Bayesian inference with HMC, and is the main reason for increasing adoption of HMC in applications (cite statistics). Meanwhile, the invention Riemmanian Manifold Hamiltonian Monte Carlo (RMHMC) \cite{girolami2011riemann}, which exploits differential geometry to aid in local adaptation of the HMC sampler, and subsequent exploration the ideas introducd in the their paper, lead to better understanding of the mathematics behind HMC \cite{livingstone2016geometric,betancourt2014geometric} and  improvements to the sampler \cite{betancourt2013generalizing,betancourt2013general}. Many of these new developments have been and will be included in the STAN language. STAN also eliminates the need for tuning HMC. Users of STAN are shielded from the implementation details and tuning parameters settings, required only to specifiy the distributions involved in the  models. 
+widespread adoption. While some of these challenges remain to this day, the development of STAN \cite{carpenter2016stan} has made it significantly easier to carry out Bayesian inference with HMC, and is the main reason for increasing adoption of HMC in applications (cite statistics). Meanwhile, the invention Riemmanian Manifold Hamiltonian Monte Carlo (RMHMC) \cite{girolami2011riemann}, which exploits differential geometry to aid in local adaptation of the HMC sampler, and subsequent exploration the ideas introducd in the their paper, lead to better understanding of the mathematics behind HMC \cite{livingstone2016geometric,betancourt2014geometric} and  improvements to the sampler \cite{betancourt2013generalizing,betancourt2013general}. Many of these new developments have been and will be included in the STAN language. STAN also eliminates the need for tuning HMC. Users of STAN are shielded from the implementation details and tuning parameters settings, required only to specifiy the distributions involved in the models. 
 
 Since STAN is so central to the present HMC literature, we would explain how it functions in the following exposition. Before that, however, we would explain the basic version of HMC on which STAN is built and to which many extensions are added. 
 
 
-Suppose we have a density $p(x),x \in \mathcal{R}^d$ from which we would like to sample. If $p(x)$ is simply the marginal density of some distribution $p(x,y), (x,y) \in \mathcal{R}^{d+p}$ in a larger space containing the original domain, then sampling from $p(x,y)$ and keeping only the $x$'s is equivalent to sampling from $p(x)$ directly. These extra variables introduced are called auxillary variables. The auxillary variables methods are known to speed up sampling by introducing extra degrees of freedom in the state space and allows the chain to move more easily across different parts of it. The Swendsen-Wang sampler \cite{wang1990cluster}, the slice sampler\cite{wang1990cluster} are well known examples of this class of methods. See \cite{liang2011advanced,liu2008monte} for more details.
+Suppose we have a density $p(x),x \in \mathbb{R}^d$ from which we would like to
+sample. If $p(x)$ is simply the marginal density of some distribution $p(x,y),
+(x,y) \in \mathbb{R}^{d+p}$ in a larger space containing the original domain, then sampling from $p(x,y)$ and keeping only the $x$'s is equivalent to sampling from $p(x)$ directly. These extra variables introduced are called auxillary variables. The auxillary variables methods are known to speed up sampling by introducing extra degrees of freedom in the state space and allows the chain to move more easily across different parts of it. The Swendsen-Wang sampler \cite{wang1990cluster}, the slice sampler\cite{wang1990cluster} are well known examples of this class of methods. See \cite{liang2011advanced,liu2008monte} for more details.
 
 The Metropolis-Hastings sampler is a general algorithm that allows us to sample from any distribution, discrete, continuous or neither, as long as we know its density up to normality. The Hamiltonian Monte Carlo (HMC) sampler is less general in that it requires the unnormalized density be continuous and differentiable. 
 
 We denote the unnormalized density of the target distribution by $P(x)$, and the normalizing constant by $Z = \int P(x)dx $, and we define the potential energy function $U(x)$ as 
 \[ U(x) =  \exp(-\log(P(x))) \]
 If we now introduce a kinetic energy function $K(y)$, and define
-the Hamiltonian as the sum of the kinetic and potential energy functions 
+the Hamiltonian as the total energy, i.e., sum of the kinetic and potential energy functions, 
 
 \[ H(x,y) = U(x) + K(y) \]
 
@@ -174,10 +176,17 @@ $
 \end{align}
 $
 
+
 To simulate the trajectory of a particle given its initial state $(x_0,y_0)$ one
-would have to discretize the Hamiltonian dynamics. The discretization should
-ideally have some nice properties that includes volume-preservation, to maintain
-stability and accuracy of the approximation over long trajectories. For the simple version of HMC where the momentum variable is independent from the position variable, i.e. $p(y|x)=p(y)$, an easy-to-implement integrator, known as the leapforg integrator, exists and works as follows. At time $t$ of the trajectory, given its current position and momentum, $q(t)$ and $p(t)$,and stepsize $\epsilon$, we would update the position and momentum at time $t+\epsilon$ by setting 
+would have to solve Hamilton's equations. Unfortunately, there are in general no
+explicit solutions for Hamilton's equations except for trivial models. One would
+then have to resort to numerical methods that discretize the Hamiltonian
+dynamics \cite{leimkuhler2004simulating}. The discretization should
+possess some nice properties , including reversibility and volume-preservation, to ensure convergence to the target distribution, as well as  maintain 
+stability and accuracy of the approximation over long trajectories, the lack of which significantly reduces the efficiency of the sampler, irrespective of model-related factors which might affect sampling efficiency, like parametrization or posterior correlation.  
+
+For the simple version of HMC where the momentum variable is independent from the position variable, i.e. $p(y|x)=p(y)$, an easy-to-implement integrator which is both volume-preserving and reversible, with lower approximation error than conventional alternatives for numerically solving like Euler's method, known as the leapforg integrator, exists and works as follows. At time $t$ of the trajectory, given its current position and momentum, $q(t)$ and $p(t)$,and stepsize $\epsilon$, we would update the position and momentum at time $t+\epsilon$ by setting 
+
 \begin{align}
     &p(t+\frac{\epsilon}{2}) = p(t) - \frac{\epsilon}{2}\cdot \frac{\partial
     U}{\partial
@@ -188,7 +197,73 @@ stability and accuracy of the approximation over long trajectories. For the simp
     q}(q(t+\epsilon))
 \end{align}
 
-Starting at some initial time $t_0$, with initial coordinates $(q(t_0),p(t_0))$, the position and momentum at time $t+s$ can be determined by repeating the steps above roughly $\frac{s}{\epsilon} = L$ times, taking care to round up or down. The advantage of the leapfrog integrator over other more well-known methods for solving ODE numerically such as Euler's method is that it is symplectic, which means it preserves volume in the phase space, just like the Hamilonian. However, it does not preserve the Hamiltonian, so the energy of the particle would oscillate as it is being simulated. It has important implications for the sampling algorithm. Intuitively, this breaks the law of conservation of energy and suggests the position of the particle at the end of its trajectory may deviate from the correct trajectory, on which the energy should be preserved. Reducing the stepsize would mitigate the problem but it comes with increased computational costs.  
+One leapfrog step consists of first a half-step update for momentum, a full-step
+for position, then another half-step for momentum. Since the update for momentum
+at time $t+\epsilon$ and time $t+\epsilon + \frac{\epsilon}{2}$ both involve
+$q(t+\epsilon)$, when $L$ leapfrog steps are used performed sequentially with
+ stepsize $\epsilon$, as done during the simulation of a trajectory when proposing a new
+ state,  we can combine the updates in the implementation, so that instead of perform two half steps for momentum $p(t+\frac{\epsilon}{2}) \rightarrow p(t+\epsilon)$, then $ p(t+\epsilon) \rightarrow p(t+\epsilon + \frac{\epsilon}{2})$, we can perform a full step for momentum $p(t+\frac{\epsilon}{2}) \rightarrow p(t+ \epsilon + \frac{\epsilon}{2}) $ as 
+\begin{align}
+p(t+\epsilon + \frac{\epsilon}{2})  
+&= p(t+\epsilon) - \frac{\epsilon}{2} \frac{\partial U}{\partial q }(q(t+\epsilon)) \\
+&= p(t+\frac{\epsilon}{2}) - \frac{\epsilon}{2} \frac{\partial U}{\partial q }(q(t+\epsilon)) - \frac{\epsilon}{2} \frac{\partial U}{\partial q }(q(t+\epsilon)) \\
+&= p(t+\frac{\epsilon}{2}) - \epsilon \frac{\partial U}{\partial q }(q(t+\epsilon))
+\end{align}
+
+Note, however, we still need $p(t+\frac{\epsilon}{2})$ to perform the full
+steps, so that at least one half step has to be made for the momentum. Also, in
+this alternative implementation of the leapfrog integrator, momentum $p$ is
+always one half step ahead of position, hence the last update for momentum has
+to be a half step so we end up with $p(t+\epsilon L)$ and $q(t+\epsilon L )$,
+both synchronized. The two implementations yield exactly the same updates, bar
+loss of accuracy from calculating the sums and extra computer time for updating
+the momentum variables twice in the naive implementation. 
+
+Starting at some initial time $t_0$, with initial coordinates $(q(t_0),p(t_0))$, the position and momentum at time $t+s$ can be determined by repeating the steps above roughly $\frac{s}{\epsilon} = L$ times, taking care to round up or down. 
+
+One advantage of the leapfrog integrator over other more well-known methods for
+solving ODE numerically such as Euler's method is that it is symplectic, which
+means it preserves volume in the phase space, just like the Hamilonian. This
+contributes to its relative stability along the trajectory compared to Euler's
+method and its modifications. An unstable trajectory as simulated by Euler's
+method would propose a state that has diverged from the energy level set to
+which the intitial state belong, which makes proposals much more likely to be
+rejected, especially in high dimensional distributions.  However,
+the leapfrog method does not preserve the Hamiltonian, so the energy of the particle would
+oscillate as it is being simulated. It has important implications for the
+sampling algorithm. Intuitively, this breaks the law of conservation of energy
+and suggests the position of the particle at the end of its trajectory may
+deviate from the correct trajectory, on which the energy should be preserved.
+Reducing the stepsize would mitigate the problem but it comes with increased
+computational costs. This necessitates the introduction of a Metropolis
+acceptance step in order to preserve the invariant distribution. To explain
+this, let's put HMC in the context of an auxillary variable method. 
+
+First, the joint distribution of the position (original) and momentum(auxillary)
+variables is factored into a product of a conditional distribution $p(x,y|E)$ and a
+marginal distribution $p(E)$
+\[ p(x,y) = p(x,y|E)p(E) \]
+
+Sampling from the joint distribution is done by first sampling from the
+auxillary (energy) distribution $p(E)$. In this case randomness comes in only from the
+resampling of the momentum variable, that is, change in the kinetic energy,
+because the potential energy is not dependent on the momentum. Then conditional on the value of the
+sampled energy, sample from the conditional distribution for the joint
+conditional distribution of the position and momentum variable. Leapfrog steps
+are involved only in the sampling from the conditional distribution $p(x,y|E)$.
+This ``sampling'' is actually deterministic as it consists of simulating a
+trajectory under Hamiltonian dynamics with given initial states. Because
+Hamiltonian flow is reversible and volume-preserving independent of numerical
+discretization, consistency theorems apply without the need for Metropolis
+correction if we can simulate Hamiltonian dynamics exactly. Indeed, there has
+been experiments with HMC where the Metropolis acceptance step is dispensed with
+and samples drawn from the resulting algorithm, when used for inference, still yields good predictive
+performance on regression tasks \cite{neal1993bayesian}, although it is offset
+by
+decreased robustness as the uncorrected trajectory could become unstable when
+the stepsize becomes too large. 
+
+
  
 Now, we describe a simple version of the HMC sampler.
 The sampler starts by drawing from the conditional (marginal because of
@@ -200,34 +275,63 @@ At the end of the trajectory we get $(q(t+L \epsilon),p(t+L \epsilon)) =
 (\tilde{q}, \tilde{p})$, which becomes the proposed state for the chain and
 is used in the calculation of the Hastings ratio. The proposed state is then accepted with probability $\min (1, \exp(H(t+L\epsilon0)-H(t)))$. 
 
-The selection of $M$ so that the momentum varibles are distributed according to
-a multivariate normal $\mathcal{N}(0, M)$ is crucial as well. Because the
-Hamiltonian function remains constant in its trajectory after the initial
-position and momentum is fixed, the only change in the value of the probabiltiy
-density function comes from the initial resampling of the momentim variables $p$
-from its marginal distribution.
-
 Here we state some facts about Hamiltonian dynamics that would help us
-understand why proposals generated from simulation of Hamiltonian dynamics would
+understand why proposals generated from the simulation of Hamiltonian dynamics would
 form a Markov Chain sampler that has the right invariant properties. 
 
-First, the Hamiltonian flow, i.e. the mapping implied by the Hamiltonian
+First, the Hamiltonian flow, i.e. the mapping induced by the Hamiltonian
 dynamics, is reversible. That is, any mapping $T_s(x(t),y(t)) =(x(t+s),y(t+s)) $
 is bijective and has an inverse $T_{-s}$. Intuitively, it says that any particle
 whose trajectory follows Hamiltonian dynamics can be returned to its initial
 state $(x_0,y_0)$ from current state $(x_t,y_t)$ by reversing the sign of $y_t$
 and having the particle follow its tracjetory for time $t$. Reversibilty is one
-of the sufficient conditons for Markov Chains to have the right invariant and
+important as one of the necessary conditons for Markov Chains to have the
+correct invariant and
 convergence properties \cite{robert2013monte}. 
 
-Second, the Hamiltonian flow $T_s$ is a volume-preserving mapping. It makes it
+Second, the Hamiltonian flow $T_s$ is a volume-preserving mapping. That is, 
+\[ Vol(T_s(A)) = Vol(A) \]
+where $A$ is a measurable set in the augmented parameter space (e.g.
+$\mathbb{R}^{2d}$) which contains
+the support of 
+joint probability density $p(x,y)$, and $Vol(\cdot)$ a volume measure. 
+It makes it
 possible to calculate the Hastings ratio without involving the determinant of
 the Jacobian matrix of the mapping $T_s$ , which might be tricky for most
 mappings. For Hamiltonian flows the determinant is just one.
 Third, the Hamiltonian is constant with respect to time, i.e., $\frac{dH}{dt} =
 0$. From the physics point of view, this is simply the conservation of energy in
 a closed system. It keeps acceptance probability high if the discrete simulation
-of the Hamiltonian dynamics is accurate enough.
+of the Hamiltonian dynamics is accurate enough, which is equivalent to staying
+close to the true trajectory. This has been mentioned earlier
+and we will look at it from another angle here. The Metropolis acceptance step
+accepts the proposed state $(x_t,y_t)$ as the next state in the Markov chain
+with probability $\min(1, \exp(-H(x_t,y_t) + H(x_0,y_0)))$, where $(x_0,y_0)$ is
+the previous state in the chain, also the initial state in the Hamiltonian
+trajectory. In theory, because we are sampling from an energy level set 
+\[ S=\{(x,y)|H(x,y)=E\} \]
+for some fixed energy value $E$, the entire trajectory
+$(x_0,y_0),(x_\epsilon,y_\epsilon),\dots (x_{\epsilon L},y_{\epsilon L})$ where
+$\epsilon L = t $ has the same Hamiltonian value $H(x_s,y_s)$. Then 
+\[ -H(x_t,y_t) + H(x_0,y_0) = 0 \]
+and the proposed state is accepted with probability 1. When a numerical
+approximation to the correct Hamiltonian dynamics is used to find the proposed
+state, it inevitably deviates from the exact trajectory, and the order of that
+error determines how large the difference $ -H(x_t,y_t) + H(x_0,y_0)$ will be.
+Although it is possible that $(x_t,y_t)$ gives a smaller energy that the initial
+state and hence resulting in an acceptance probability of 1 as well, empirical
+evidence suggests that the Hamiltonian tends to oscillate along the trajectory
+traced out by leapfrog, and hence it is equally likely for $\exp(\Delta H)$to be
+larger or less than 1. 
+
+Having discussed the Hamiltonian function, we now look at one of its two
+components, the kinetic energy function $K(y)$.  
+
+Because the
+Hamiltonian function remains constant along its trajectory after the initial
+position and momentum is fixed, the only change in the value of the joint probabiltiy
+density function $p(x,y)$ comes from the initial resampling of the momentum variables $y$
+from its marginal distribution.
 
 From the theory of auxillary variable sampling we see that there are infinitely
 many marginal distributions for the momentum variable $y$ that would give the
@@ -235,31 +339,78 @@ same target marginal distribution for the original parameter $x$. For example,
 if we restrict 
 \[ y \sim \mathcal{N}(0,M) \]
 where $M$ is positive definite then any choice of $M$ on the support gives a
-different kinetic energy and, by extension, Hamiltonian functions. In the HMC
-literature, the focus has been on Gaussian kinetic energies, even though it is only
-supported by empirical evidence and intuition appealing to the central limit
-theorem. This is one of the two important tuning parameters of the sampler. Its
-selection has mainly to do with decorrelating the irregular geometry of the
-target distribution. For example, if we would like to sample from a multivariate
-Gaussian distribution with highly skewed covariance, one could adopt a mass
-matrix $M$ for the kinetic energy correspondingly and sampling can be shownto be
-equivalent to sampling from a standard Gaussian with identity covariance in a
-linearly transformed parameter space. (Talk about linear transformation)
+different kinetic energy and, by extension,a different Hamiltonian function. In the HMC
+literature, the focus has been on Gaussian kinetic energies, 
+justified by empirical performance and intuition appealing to the central limit
+theorem. In Girolmani and Calderhead's paper \cite{girolami2011riemann} they experimented
+with the more heavy-tailed Student-T distribution and found it to perform not as
+well
+as Gaussian momentum distributions. For the rest of the discussion of HMC we
+assume a Gaussian distribution is used to model the marginal variables.
 
-To see this, let $x' = Ax$, where $A$ is a invertible matrix. If we also
+This is one of the two important tuning parameters of the sampler. Its
+selection mainly has to do with decorrelating the irregular geometry of the
+target distribution. For example, if we would like to sample from a multivariate
+Gaussian distribution with a highly skewed covariance, one could adopt an
+appropriately adjusted mass
+matrix $M$ for the kinetic energy, and the induced sampling can be shown to be
+equivalent to sampling from a standard Gaussian with identity covariance in a
+linearly transformed parameter space. Sampling from a standard Gaussian
+distribution is easy
+for HMC and for MCMC in general, because all the variables are independent and on
+the same scale. Dimensionality has no impact on sampling in this case because
+each dimension is sampled independently and separately, and since the proposal
+distribution is Gaussian it is very easy explore the support of the target
+distribution in the 1-dimensional as it overlaps with the target distribution
+exactly. 
+
+To see how to transform the problem of sampling from a skewed multivariate
+Gaussian distribution to sampling from a standard Gaussian, let $x' = Ax$, where $A$ is a invertible matrix. If we also
 transform the momentum variables $y' = (A^T)^{-1}y$ ,then the
 Hamilton's equations for the transformed variables $(x',y')$ will be the same as
-the original variables $(x,y)$. This also implies that HMC is rotationally
-invariant. 
+the original variables $(x,y)$. As an aside, note this also implies that HMC is rotationally
+invariant, i.e. if $A$ is orthgonal, $A^{-1} = A^T$, then reparametrizing the
+variables by  multiplying $(x,y)$ by $A$ would result in exactly the same simulated
+trajectories if we keep all tuning parameters the same.
 
-Suppose we want to sample from $x \sim \mathcal{N}(0,\Sigma)$. If let $y \sim
+Suppose we want to sample from $x \sim \mathcal{N}(0,\Sigma)$. Let $y \sim
 \mathcal{N}(0,\Sigma^{-1})$, then the updates would be equivalent to using an
 identity covariance for $y$ for drawing from a standard multivariate Gaussian
 distribution. This setting is ideal for sampling efficiency because the
 covariates are indepenent and the standard deviations for the $x$ variables and
-that for the $y$ variables are on the scale. This is exactly the
-reparametrization trick for improving mixing in general MCMC methodology.
-
+that for the $y$ variables are on the scale. Dimensionality has no impact on sampling in this case because
+each dimension is sampled independently and separately, and since the proposal
+distribution is Gaussian it is very easy explore the support of the target
+distribution in the 1-dimensional as it overlaps with the target distribution
+exactly. 
+This is exactly the
+reparametrization trick for improving mixing in general MCMC methodology. This
+fact about the HMC suggests it would improve sampling efficiency if one has
+access to the covariance of the target distribution and its inverse, although this is true for
+MCMC sampling in general as well. 
+(Pseudo Code for basic HMC)
+\begin{algorithm}
+    \caption{HMC update}
+    \comment{Input: potential energy function $U(x)$, its gradient
+        $\nabla U(x)$, initial position $x_0$, $\epsilon$,
+    $L$,$\Sigma$} 
+    \State{$x = x_0$}
+    \State{$y = \mathcal{N}(0,\Sigma)$}
+    \State{$y_{c} = y$}
+    \For{$i = 1:L$}
+    \State{$y = y - \frac{\epsilon}{2} * \nabla U(x)$}
+    \State{$x = x + \epsilon * \Sigma^{-1} y $}
+    \State{$y = y - \frac{\epsilon}{2} * \nabla U(x)$}
+    \EndFor
+    \State{$y = -y $}
+    \State{$H_{c} = U(x_0) + \frac{y_c^T\Sigma^{-1}y_c}{2}$}
+    \State{$H_{p} = U(x) + \frac{y^T\Sigma^{-1}y}{2}$}
+    \State{$u  = Unif(0,1)$}
+    \If{ $u < \exp(H_{c} - H_{p})$ }
+        \State{$out = x$}
+    \Else
+        \State{$out = x_0$}
+\end{algorithm}
 There are several reasons why HMC is better than random-walk Metropolis. First,
 it avoids random walks. Random walks are inefficient because successive
 proposals might double back to previous positions, thus limiting the range of
