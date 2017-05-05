@@ -411,6 +411,7 @@ MCMC sampling in general as well.
     \Else
         \State{$out = x_0$}
 \end{algorithm}
+
 There are several reasons why HMC is better than random-walk Metropolis. First,
 it avoids random walks. Random walks are inefficient because successive
 proposals might double back to previous positions, thus limiting the range of
@@ -426,15 +427,27 @@ interval $(-\sqrt{\sigma},\sqrt{\sigma})$.
 On the otherhand, since leapfrog steps are deterministic given initial position
 and momentum, the distance moved will be proportional to $n$. 
 Second, HMC is much more efficient in
-high-dimensional settings. Because RW Metropolis randomly proposes changes in
-the $2^p$ possible directions, it becomes exponentially more difficult to move
+high-dimensional settings. Because random walk Metropolis randomly proposes changes in
+the $2^p$ possible directions, it becomes exponentially more unlikely to move
 to an area of the support where there is significant mass. The acceptance
 probability would be extremely low and the chain becomes stuck. On the other
 hand, because HMC uses information of the gradient and an auxillary variable
 tuned to the curvature of the target distribution, the exploration stays close
-to the mode and the high density neighbourhood around it. The gradient draws the
+to the mode and the high density neighbourhood around it. There is a delicate
+balance between staying close to the mode and in the neighbourhood containing
+the mode. From almost any standard introduction to statistical learning \cite{friedman2001elements} we learn about the curse of dimensionality, which says that the probability mass in the neighbourhood containing the mode of the density function decreases exponentially as the dimension increases. This means that simply sampling from around the mode will miss a lot of the support which contributes to the integral, but it remains an important starting point because the interesting part of the support lies just outside the immediate neighbourhood of the mode. The gradient draws the
 trajectory to
-the mode while the momentum variable keeps it from getting stuck there.
+the mode while the momentum variable keeps it from getting stuck there and moves it around with each resampling.
+
+We have described some of the advantages of HMC, but unfortunately it has one great disadvantage, which is its sensitivity to tuning parameters. 
+In the description of the basic HMC sampler above, we assume the stepsize $\epsilon$, trajectory length $L$, and the momentum covariance $M$ are known. These cannot be set arbitrarily as the performance of the algorithm can change completely when they are not set appropriately. HMC can perform no better than random walk Metropolis --itself an highly inefficient sampler-- for high-dimensional distributions. The manual tuning of these parameters is the next part of our discussion. 
+
+The first parameter we will discuss is the stepsize $\epsilon$. A small stepsize would cost more computation time but gives better approximation to the correct trajcetory. Worse still, when a too large stepsize is used, there is no constraints on how far the simulated trajectory would deviate from teh correct one. The simulated trajectory could quickly diverges to a region of the support where the Hamiltonian function blows up. There needs to be a mechanism in the algorithm to detect divergence due to the stepsize and signals us to possibly tune it down, otherwise the unstable trajectory would diverge to infinity in terms of its Hamiltonian function value and causes numerical instability. It is suggested by Neal that introducing a random jitter around the stepsize fat the start of each trajectory, for example, use $\epsilon + \epsilon*Unif(-0.1,0.1)$ instead of $\epsilon$,  would help alleviate the problem, as sometimes the trajectory would be simulated using a stepsize under the stability limit for $\epsilon$, which can differ between different parts of the support of $p(x,y)$. This also deals with the problem of accidentally have $\epsilon L$ match the period of some variable or equivalently simulate a trajectory which returns to the original position at the end of its trajectory. This destroys ergodicity and makes the sampler biased.
+
+The second parameter of interest is the trajectory length $L$. Once $\epsilon$ is fixed, it is essentially a proxy for integration time $T= \epsilon L$. It controls how much of the state space is explored at each iteration of the Markov chain. The longer we let the trajectory run the more of the state space would be explored, but letting it run too long we would eventually come back to the initial position and the exploration is wasted. Similar to the discussion about tuning $\epsilon$, the tuning of $L$ could differ on different parts of the state space. 
+
+In the basic HMC sampler, we use the same $\epsilon$ and $L$ throguhout the entire sampling process. The best practice for handtuning was given by Neal, who suggests doing several preliminary runs with a combination of $\epsilon$ and $L$ values using the acceptance rate as guidance. There is no guarantee of optimality and in even moderately complex distributions we never know whether we have sufficiently integrated the trajectory long enough. The optimal acceptance rate for HMC has been derived as $0.65$. Optimality here is defined with respect to the cost of obtaining an independent point. See \cite{neal} for an intuitive derivation and see \cite{} for a theoretical derivation. In the actual implementation, it becomes quite common to use the heuristics: first fix $\epsilon L = T$, then adjust $\epsilon$ and $L$ by setting $\epsilon = \frac{\epsilon}{10} $ and $L = 10L$ and see the changes reflectd in diagnostics such as $ESS$ and traceplots. This sort of handtuning is the same as the tried-and-true manual tuning strategies from the MCMC literature, and shares with them the disadvantage of requiring human intervention after each chain is sampled. 
+
 
 
 When the target distribution has more complicated geometry which might differ in
