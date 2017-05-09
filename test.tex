@@ -446,23 +446,68 @@ The first parameter we will discuss is the stepsize $\epsilon$. A small stepsize
 
 The second parameter of interest is the trajectory length $L$. Once $\epsilon$ is fixed, it is essentially a proxy for integration time $T= \epsilon L$. It controls how much of the state space is explored at each iteration of the Markov chain. The longer we let the trajectory run the more of the state space would be explored, but letting it run too long we would eventually come back to the initial position and the exploration is wasted. Similar to the discussion about tuning $\epsilon$, the tuning of $L$ could differ on different parts of the state space. 
 
-In the basic HMC sampler, we use the same $\epsilon$ and $L$ throguhout the entire sampling process. The best practice for handtuning was given by Neal, who suggests doing several preliminary runs with a combination of $\epsilon$ and $L$ values using the acceptance rate as guidance. There is no guarantee of optimality and in even moderately complex distributions we never know whether we have sufficiently integrated the trajectory long enough. The optimal acceptance rate for HMC has been derived as $0.65$. Optimality here is defined with respect to the cost of obtaining an independent point. See \cite{neal} for an intuitive derivation and see \cite{} for a theoretical derivation. In the actual implementation, it becomes quite common to use the heuristics: first fix $\epsilon L = T$, then adjust $\epsilon$ and $L$ by setting $\epsilon = \frac{\epsilon}{10} $ and $L = 10L$ and see the changes reflectd in diagnostics such as $ESS$ and traceplots. This sort of handtuning is the same as the tried-and-true manual tuning strategies from the MCMC literature, and shares with them the disadvantage of requiring human intervention after each chain is sampled. 
+In the basic HMC sampler, we use the same $\epsilon$ and $L$ throguhout the
+entire sampling process.  
+
+Neal suggests doing several preliminary runs with a combination of $\epsilon$ and $L$ values using the acceptance rate as guidance. There is no guarantee of optimality and in even moderately complex distributions we never know whether we have sufficiently integrated the trajectory long enough. The optimal acceptance rate for HMC has been derived as $0.65$. Optimality here is defined with respect to the cost of obtaining an independent point. See \cite{neal2011mcmc} for an intuitive derivation and see \cite{beskos2013optimal} for a theoretical derivation. This sort of handtuning is the same as the tried-and-true manual tuning strategies from the MCMC literature, and shares with them the disadvantage of requiring human intervention after each chain is sampled. 
+
+A heuristic for handtuning was given by Gelman et al
+\cite{gelman2014bayesian}: first fix $\epsilon L = T$, then adjust $\epsilon$
+and $L$ by setting $\epsilon = \frac{\epsilon}{10} $ and $L = 10L$ and see the
+changes reflectd in diagnostics such as $ESS$ and traceplots. Of course, one
+problem with this heuristic is that it fixes the integration time at $1$, which
+might be too long or too short, depending on the contour of the target. The handtuning process can be made somewhat more efficient by listing all feasible values
+for $\epsilon$ and $L$ and select the best combination by performing a grid-search. This only works if we accept
+the use of a one-dimensional diagnostic to quantify the quality of samples
+generated from a pair of $\{\epsilon,L\}$ values. This can be done by Bayesian
+optimization as well. Whether selected by handtuning or Bayesian optimization,
+the tuning process has no impact on the ergodicity of the sampler as we only
+use the samples generated once we have decided on a pair of tuning parameters
+$(\epsilon,L)$. This approach does not utilize information about the target
+distribution, relying only on inappropriate choices of parameters to be weeded
+out when the diagnostics indicate poor results.
+
+In Neal's thesis he suggested a way to tune $\epsilon$ together with the
+momentum distribution under the assumption that the latter has a diagonal
+covariance matrix. We would set the stepsizes $\epsilon_i$ individually for each
+covaraite as 
+\[ \epsilon_i  = \eta (\frac{\partial^2 H}{\partial x^2})^{-\frac{1}/{2}}\]
+where $\eta$ is an extra tuning parameter to be set as $0<\eta<1$. In this
+modified version of HMC, we still have to tune for the integration time $T$ via
+the trajectory length $L$. 
+
+In general the momentum distribution can be tuned by first exploring the density
+with a simple HMC sampler with standard Gaussian momentum distribution, then use
+the samples to estimate the covariance matrix of the target distribution, the
+inverese of which could be set as the covariance. The disadvantage of allowing
+arbitrary covaraince matrices for the momentum distribution is the $O(p^3)$ time
+complexity for inverting matrices, which quickly becomes problematic as the
+problem becomes high dimensional. 
 
 
-
-When the target distribution has more complicated geometry which might differ in
+Another problem with the above approach is that it is only unsuitable when the
+target distribution can be approximately linearly transformed into a
+distribution which can be easily explored by a basis HMC sampler.If the target
+distribution has more complicated geometry that might differ in
 curvature in various parts of its support, a constant $M$ is not enough to ensure
 effective decorrelation during sampling. This motivates the use of
 a location-dependent mass matrix $M(x)$ and is called the Riemannian Hamiltonian
 Monte Carlo. More on this later. 
 
-The other important tuning parameter is the integration time. Theoretically this
+So far we have already touched upon the integration time in discussion of
+its connection with stepsizes and trajectory lengths. It is a tuning parameter
+that exists in both the theoretical and numerical version of HMC. In the
+theoretical version, we assume Hamiltonian dynamics can be simulated exactly,
+even then we would still have to decide the duration for which the imaginary
+particle is integrated. This
 is the amount of time we decide to simulate the trajectory in the augmented
 space $(x,y)$ before projecting back to the sample space $(x)$. In any
 numerical implementation this is subsumed in the product of the stepsize and the
 number of leapfrog steps $\epsilon L$. It influences mainly the exploration of
 the augmented space, where a trajectory is simulated along the level set
 $\{(x,y):H(x,y)=E\}$.
+
+Now begin discussion of RMHMC.
 
 
 Another important trick in speeding up Hamiltonian Monte Carlo is Neal's window
