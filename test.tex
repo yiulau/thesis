@@ -468,13 +468,85 @@ distribution, relying only on inappropriate choices of parameters to be weeded
 out when the diagnostics indicate poor results.
 
 In Neal's thesis he suggested a way to tune $\epsilon$ together with the
-momentum distribution under the assumption that the latter has a diagonal
-covariance matrix. We would set the stepsizes $\epsilon_i$ individually for each
-covaraite as 
-\[ \epsilon_i  = \eta (\frac{\partial^2 H}{\partial x^2})^{-\frac{1}/{2}}\]
+momentum distribution,  under the simplfying assumption that the potential
+energy function $U(x)$ is the density functionf of a multivariate Gaussian distribution
+with a diagonal
+covariance matrix. The momentum distribution is assumed to have diagonal
+covariance $M= diag(\{m_i\}_{i=1}^p)>$ as well. Tuning the momentum is
+equivalent to tuning the $m_i$'s, which because the way the leapfrog updates
+work is equivalent to tuning stepsizes $\epsilon_i$ individually for each
+variables. We would set them as
+
+\[ \epsilon_i  = \eta (\frac{\partial^2 U}{\partial x^2})^{-\frac{1}{2}}\]
 where $\eta$ is an extra tuning parameter to be set as $0<\eta<1$. In this
 modified version of HMC, we still have to tune for the integration time $T$ via
-the trajectory length $L$. 
+the trajectory length $L$. This heuristic is based on the idea that if the
+marginal distribution for $x_i$ is $\mathcal{N}(0,\sigma_i)$, then a
+stepsize $\epsilon_i > 2 \sigma_i$ would overshoot and causes low acceptance
+rate. It is equivalent to setting $\epsilon_i = \eta \sigma_i$, and when $\eta
+\approx 1$ it is optimal in the sense that it reaches the boundary of its
+distribution in one update. Note that $  \frac{\partial^2 U}{\partial x^2}$ is
+independent of $x$ under the assumption, and the same cannot be said of any real
+models, for which the second derivatives of the potential energy, commonly
+defined as the negative log of the posterior density, almost certainly would
+have a dependency on the variables $x_i$. In Neal's tuning of BNN's, he used
+various model-dependent approximation tricks to get rid of the dependency on
+$x$. To implement this trick for general bayesian models would require
+problem-solving each time a new model is used, which makes it impractical for
+quick sampling, not to mention there are better ways of adaptively tuning
+stepsizes and momentum distribution parameters. One principle about tuning
+the stepsize, assuming we are not varying stepsizes across varibles, is that it
+should be less than the minimum 2$\sigma_{min}$, $\sigma_i$'s being the marginal
+covariance of the target variables $\mathbf{x}$. The reason that it causes low
+acceptance rate when violated is that the trajectory simulated by the subsequent
+leapfrog steps would be unstable, moving the particle far away from the energy
+level set the trajectory is supposed to stay on. This type of unstable
+simulation is called divergence. On this note, we end our discussion of the
+standard HMC sampler.
+
+Now, STAN has many tiny yet crucial tricks which form part of the adaptive
+tuning and diagnostic mechanism. Bear in mind that Bayesian inference with STAN is not completely
+automatic because judgement still has to be made upon reviewing the results of
+the returned samples to determine if they are valid. And like traditional MCMC
+diagnostics this judgement is not completely objective in the sense that there
+are no metrics that come with theoretical guarantees. 
+
+First we describe how it uses
+divergence to diagnose $\epsilon$'s that are too large. First, a large constant
+is selected $Th = 1000$, then after each proposal $(x_i,y_i)$, we compare the
+energy value $H(x_i,y_i)$ with that of the previous state $H(x_{i-1},y_{i-1})$,
+if $|H(x_i,y_i) - H(x_{i-1},y_{i-1})|> Th$ then a divergence is flagged and the
+proposal rejected. At the end of the sampling stage, the total number of
+divergence indicates potential problem with the chosen stepsize. Typically the
+only resposne available is to reduce the stepsize and slow down sampling,
+although persistent divergence may call for reparametrization as the parameter
+space may have many sharp edges and steep wells that no stepsizes are small
+enough to navigate the space. The existence of divergence implies the samples
+drawn may be biased and hence invalid. This is not a diagnostic to be ignored.
+
+The second diagnostic tool that comes with STAN is the Bayesian fraction of
+missing information (BFMI). It detects a mismatched conditional Hamiltonian
+energy function
+distribution to the marginl Hamiltonian distribution. The leapfrog step is
+restricted to exploring a level set determined by the 
+initial positions $(x_i,y_i)$ at the start of the trajectory. Given the previous
+state $x_i$, the only randomness comes from the resampling of the auxillary
+momentum distribution. Since the goal is
+to explore the entire parameter space, we want the two energy distributions to
+closely match each other. BFMI allows us to measure that match. Formally it is defined as 
+\[ BFMI = \frac{ E_\pi[Var_{\pi_{H|x}}[H|x]]}{Var_{pi_H}[H]} \]
+where $\pi$ is the marginal distribution of $x$ and $\pi_{E|x}$ and $\pi_{H}$
+are the conditional and marginal distributions of the Hamiltonian energy
+function $H$ respectively. In practice the expectations must be estimated, but
+it is easily done by evaluting the energy function at the values coming from the
+generated Markov chain. Suppose $N+1$ samples are drawn, 
+
+\[ \hat{BFMI} = \frac{\sum_{n=1}^N(H_n-H_{n-1})^2}{\sum_{n=0}(H_n-\bar{H})^2} \]
+where $H_n = H(x_n,y_n)$ and $\bar{H}=\frac{1}{N+1}\sum_{n=0}^N H_n$. From basic
+probability we have $0 \le BFMI \le 1 $ and the optimal value is when it is
+1. A low value of $BFMI$ suggests that the auxillary momentum distribution is
+inefficient for sampling. 
+
 
 In general the momentum distribution can be tuned by first exploring the density
 with a simple HMC sampler with standard Gaussian momentum distribution, then use
@@ -507,10 +579,15 @@ number of leapfrog steps $\epsilon L$. It influences mainly the exploration of
 the augmented space, where a trajectory is simulated along the level set
 $\{(x,y):H(x,y)=E\}$.
 
-Now begin discussion of RMHMC.
+Now we describe how the stepsizes are automatically tuned in STAN.
 
+There exists an extension of the basic HMC sampler that increases the acceptance
+rate by proposing a trajectory instead of proposing just a state at the end
+of the trajectory. Two trajectories are proposed, one containing the initial state; one
 
-Another important trick in speeding up Hamiltonian Monte Carlo is Neal's window
+of the two trajectories is chosen then a state is sampled from the chosen
+trajectory. The HMC update step is then much more likely to propose and accept
+a state different from the initial state. This is Neal's window
 method \cite{neal1992improved}. 
 
 First we select a window size $W < L$, then sample randomly $s \in \{0, 1,2 , \dots , W -1 \}$. Take the current $(q,p)$ as $(q_s, p_s)$, we geneerate the sequence $[(q_0,p_0),(q_1, p_1), \dots (q_L,p_L)]$ deterministically by applying forward leapfrog steps (original leapfrog step with stepsize $\epsilon) for $(q_i,p_i), i > s $, and backward leapfrog steps (stepsize equal to $-\epsilon$. ). 
@@ -528,7 +605,11 @@ where $A,R$ are the set of indices for pairs belonging to the acceptance window 
 
 Once a window has been chosen, we select a pair among the $W$ pairs in the window with probability weighted by $P(q_i,p_i)$. That is, suppose the rejection window is chosen, we chose the new state to be $(q_i,p_i)$, $i \in {0,\dots,W-1}$ with probability 
 \[ \frac{P(q_i,p_i)}{\sum_{j=0}^{W-1} P(q_j,p_j)} \]
-It shows that even when we don't accept the proposal window near the end of the trajectory (acceptance window), there is still a probability of moving the chain away from its current state. This method generates a Markov Chain that leaves the target distribution invariant, and has been applied by Neal in neural network models to increase acceptance probability of the HMC sampler\cite{neal1992improved}. 
+It shows that even when we don't accept the proposal window near the end of the trajectory (acceptance window), there is still a probability of moving the chain away from its current state. This method generates a Markov Chain that leaves the target distribution invariant, and has been applied by Neal in neural network models to increase acceptance probability of the HMC sampler\cite{neal1992improved}. The two reasons for discussing the Window method are first that it has been shown to
+significantly improve sampling from BNN models and second that a special case of
+the method is incorporated in the No U-Turn sampler implemented in STAN. 
+
+
 
 Another trick that helps to speed up the HMC sampler is data subsampling, also denoted partial gradient in Neal's thesis \cite{neal2012bayesian}.
 Assuming there are $n$ data points, the potential energy function $U(q)$ can be written as 
@@ -539,8 +620,12 @@ where $I$ is a subset of $\{1,\dots, n}$ of size $\frac{k}{n}$.
 More pratically, if we divide the datapoints into $M$ equally sized subsets. Then for any such subset $S$, the potential energy function can be approximated by 
 \[ U(q) \approx    -\log(p(q)) + M \sum_{i \in S} \log(p(q|data_i)) \]
 
-Note to preserve the correct invariant distribution, the calculation of the potential energy function in the Hastings ratio must be done exactly. 
-randomly varying the trajectory length is a recommended part of standard HMC methodology
+Note to preserve the correct invariant distribution, the calculation of the
+potential energy function in the Hastings ratio must be done exactly. In later
+discussion of stochastic gradient HMC sampler and extensions, we see data
+subsamlping being combined with stochastic optimization to yield 
+randomly varying the trajectory length is a recommended part of standard HMC
+methodology. 
 
 HMC is invariant to rotation.
 Randomly choose stepsize. 
