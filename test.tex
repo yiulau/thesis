@@ -579,8 +579,34 @@ number of leapfrog steps $\epsilon L$. It influences mainly the exploration of
 the augmented space, where a trajectory is simulated along the level set
 $\{(x,y):H(x,y)=E\}$.
 
-Now we describe how the stepsizes are automatically tuned in STAN.
+Now we describe how the stepsizes are automatically tuned in STAN. First, keep
+in mind that the stepsize is adapted only during the warmup phase and stays
+fixed during the sampling phase. This ensures the correctness of the algorithm
+as the induced Markov chain resulted from an adaptive stepsize may not be
+reversible. One way of manual tuning is try to find the stepsize
+$\epsilon'$ that would result in an acceptance probability of $0.65$. The
+acceptance probabiilty is an averaged quantity, calculated as an expectation
+over a chain. That is, we try to optimize $\epsilon \in \mathbb{R}$ with respect
+to the function 
+\[ h(\epsilon) = E_\pi[f(X)|\epsilon]  = \lim_{T \rightarrow \infty} \frac{1}{T}
+\sum_{t=1}^T E[f(X_t)|\epsilon] \]
 
+where $f(X_t)$ denotes the acceptance probability for iteration $t$. The
+second equality comes from the convergence of the MCMC sampler. This is a
+stochastic optimization problem, and STAN uses the dual averaging scheme of
+Nesterov compute the stepsize. The dual averaging scheme works in general as
+follows, supose we are trying to find $x\in \mathbb{R}$ such that $h(x) =
+E[H_t|x] = 0$ then we perform the updates 
+
+\[x_{t+1}  = \mu - \frac{\sqrt{t}}{\gamma} \frac{1}{t+t_0} \sum_{i=1}^tH_i;
+\bar{x}_{t+1} = \eta_t x_{t+1} + (1-\eta_t) \bar{x}_t \]
+
+where $\mu$ is the target that the $x_t$'s are shrunk towards, $\gamma > 0$ a
+paramater that controls the amount of shrinkage, $t_0 \ge 0$ a parameter that
+stablizes the early iterations, and $\eta_t = t^{-\kappa},\kappa>0$ is a
+stepsize schedule ensuring convergence. Since $\epsilon>0$, this is technically
+a constrained optimization problem, but it can be easily converted into an
+unconstrained problem by optimizing for $\log(\epsilon)$ instead. 
 There exists an extension of the basic HMC sampler that increases the acceptance
 rate by proposing a trajectory instead of proposing just a state at the end
 of the trajectory. Two trajectories are proposed, one containing the initial state; one
