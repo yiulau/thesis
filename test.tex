@@ -1,6 +1,6 @@
 \documentclass{book}
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath,fullpage,amsfonts,amssymb,tikz,geometry,amsthm,pgfplots,algorithm,algpseudocode}
+\usepackage{amsmath,fullpage,amsfonts,amssymb,tikz,geometry,amsthm,pgfplots,algpseudocode}
 \geometry{margin=0.5in}
 \usetikzlibrary{matrix}
 \pgfplotsset{soldot/.style={color=blue,only marks,mark=*}} \pgfplotsset{holdot/.style={color=blue,fill=white,only marks,mark=*}}
@@ -51,7 +51,7 @@ See more about Bayesian data analysis in \cite{gelman2014bayesian}.
 The Metropolis-Hastings sampler.
 
 Suppose we have a an unnormalized density $p(x)$, and $q(x,y)$ is a proposal function such that conditional on the current state $x$, the probability of moving from $x$ to a measurable set $A$ is denoted by $q(x,A)$, we can calculate the Hastings ratio
-\[ r(x,y) = \frca{p(y)q(y,x)}{p(x)q(x,y)}. \]
+\[ r(x,y) = \frac{p(y)q(y,x)}{p(x)q(x,y)}. \]
 
 Then we accept the move to state $y$ with probability $ \min (1, r(x,y)) $, and stay in the current state otherwise.
 
@@ -66,11 +66,11 @@ introduces some bias into the samples drawn. To offset this, a Metropolis
 acceptance step is introduced and this gives the Metropolis Adjusted Langevin
 Algorithm. 
 
-
+\iffalse
 \begin{algorithm}
 \caption{Metropolis-Adjusted Langevin Algorithm}
 \Comment{$iter$ is the maximum number of iterations, $p(\cdot)$ is the unnormalized target density, $\tau$ is the variance parameter}
-\Function{MALA}{$iter,p(\cdot),\tau$} 
+\Function{MALA}{$iter,p(\cdot),\tau$}
 \State $x_0$ is initialized randomly.
 \For{ i in 1:$iter$}
 \State $Z \sim \mathcal{N}(0, I_d) $
@@ -85,6 +85,7 @@ Algorithm.
 \EndFor
 \EnfFunction
 \end{algorithm}
+\fi
 \begin{enumerate} 
 
 
@@ -162,19 +163,19 @@ we get that
 
 has $P(x)$ as the marginal density, and thus defines an auxilary variable method. In statistical applications,we usually have $P(x)$ as the unnormalized posterior
 density, 
-\[U(q) = -\log(\mathtext{prior}(x) \cdot \mathtext{likelihood}(x|data) ), \]
+\[U(q) = -\log(\textbf{prior}(x) \cdot \mathbf{likelihood}(x|data) ), \]
 and 
 \[K(y) = \sum_{i=1}^d \frac{y_i^2}{m_i} \]
 ,which is equivalent to introducing an independent multivariate Gaussian random variable of
 the same dimension as the original distribution as an auxilary variable. 
 
 Note that there is physical interpretation of the system. The Hamiltonian uniquely determines the motion of a particle, whose position in space at any time is described by the $x$ coordinates, and whose momentum is described by the $y$ coordinates. Its motion can be described by solving a system of ordinary differnetial equations in Hamiltonain dynamics, known as Hamilton's equations:
-$
+
 \begin{align}
     \frac{dx}{dt} = \frac{\partial H}{\partial y }
     \frac{dy}{dt} = -\frac{\partial H}{\partial x}
 \end{align}
-$
+
 
 
 To simulate the trajectory of a particle given its initial state $(x_0,y_0)$ one
@@ -389,6 +390,7 @@ fact about the HMC suggests it would improve sampling efficiency if one has
 access to the covariance of the target distribution and its inverse, although this is true for
 MCMC sampling in general as well. 
 (Pseudo Code for basic HMC)
+\iffalse
 \begin{algorithm}
     \caption{HMC update}
     \comment{Input: potential energy function $U(x)$, its gradient
@@ -411,7 +413,7 @@ MCMC sampling in general as well.
     \Else
         \State{$out = x_0$}
 \end{algorithm}
-
+\fi
 There are several reasons why HMC is better than random-walk Metropolis. First,
 it avoids random walks. Random walks are inefficient because successive
 proposals might double back to previous positions, thus limiting the range of
@@ -616,7 +618,7 @@ trajectory. The HMC update step is then much more likely to propose and accept
 a state different from the initial state. This is Neal's window
 method \cite{neal1992improved}. 
 
-First we select a window size $W < L$, then sample randomly $s \in \{0, 1,2 , \dots , W -1 \}$. Take the current $(q,p)$ as $(q_s, p_s)$, we geneerate the sequence $[(q_0,p_0),(q_1, p_1), \dots (q_L,p_L)]$ deterministically by applying forward leapfrog steps (original leapfrog step with stepsize $\epsilon) for $(q_i,p_i), i > s $, and backward leapfrog steps (stepsize equal to $-\epsilon$. ). 
+First we select a window size $W < L$, then sample randomly $s \in \{0, 1,2 , \dots , W -1 \}$. Take the current $(q,p)$ as $(q_s, p_s)$, we geneerate the sequence $[(q_0,p_0),(q_1, p_1), \dots (q_L,p_L)]$ deterministically by applying forward leapfrog steps (original leapfrog step with stepsize $\epsilon$) for $(q_i,p_i), i > s $, and backward leapfrog steps (stepsize equal to $-\epsilon$. ). 
 Then the acceptance window is a sequence of $W$ $(q_i,p_i)$ pairs at the end of the trajectory, more specifically,
 
 \[ \{(q_{L-W+1},p_{L-W+1}), \dots , (q_L,p_L)\} \]
@@ -642,7 +644,7 @@ Assuming there are $n$ data points, the potential energy function $U(q)$ can be 
 \[ U(q) = -\log( p(q) p(q|data) = -\log(p(q)) -\log p(q|data) = -\log(p(q)) - \sum_{i=1}^n \log p(q|data_i) \]
 where $p(q)$ is the prior density function and $p(q|data)$ is the likelihood function. Note that the finite series in the last expression above can be approximated as 
 \[ \sum_{i=1}^n \log p(q|data_i) \approx \frac{n}{k} \sum_{i \in I} \log p(q|data_i) \]
-where $I$ is a subset of $\{1,\dots, n}$ of size $\frac{k}{n}$. 
+where $I$ is a subset of $\{1,\dots, n\}$ of size $\frac{k}{n}$. 
 More pratically, if we divide the datapoints into $M$ equally sized subsets. Then for any such subset $S$, the potential energy function can be approximated by 
 \[ U(q) \approx    -\log(p(q)) + M \sum_{i \in S} \log(p(q|data_i)) \]
 
@@ -698,8 +700,7 @@ each momentum variable before updating it by $\sqrt{\alpha}$ where $\alpha$ is s
 half of the directory. \cite{neal1996sampling}
 
 \end{enumerate}
-\isection{Neural networks} 
-\begin{enumerate}
+\section{Neural networks} 
 Deep learning, a field in machine learning studying multilayered neural network models, has become quite successful in artificial intelligence tasks and a lot of research has been, and is currently underwayto improve our understanding of these models and apply them better and to more fields. See \cite{Goodfellow-et-al-2016-Book,lecun2015deep} a general introduction into the methodology and application of deep learning, and \cite{schmidhuber2015deep} for an in-depth literature review. It is futile to attempt a complete overview of the field because it is too vast but we will provide some pointers that reflect what the author finds important and some motivations. 
 
 Before there was deep learning, a term which only came about in the mid 2000s, there were Neural Networks \cite{bishop1995neural,ripley2007pattern}, which were also hugely popular in the 90s, but ultimately could not scale up. The main reason for this was the difficulty of training neural networks of more than one or two hidden layers. Traditional optimization techniques like stochastic gradient descent with backpropogation did not improve empirical test error for networks with more layers,not until ideas like pre-training to initialize optimization were experimented could we fit "deep" neural networks with more than 2 hidden layers. This restarted the field, now rebranded as Deep learning, and innovations like using the rectified linear units as activation functions \cite{nair2010rectified} to allow training deep networks without pre-training, and using GPUs to speed up practical training process \cite{krizhevsky2012imagenet}, as well as the creation of numerical libraries like Theano \cite{bergstra2010theano}, Caffe \cite{jia2014caffe}, Tensorflow\cite{tensorflow2015-whitepaper}, to name a few, that make building and training neural network models much easier by automating the backpropogation step with symbolic differentiation \cite{bahrampour2015comparative} and handles the transition between CPU and GPU computation modes. 
@@ -738,11 +739,8 @@ Further work by \cite{gal2015dropout}, shows that heuristic training techniques 
 The most exact way to perform bayesian inference for BNNs is still MCMC sampling as pioneered in Neal's thesis. In his work he put a hiearchical prior on the weights of the network and sampled the weights with HMC and the hyperparameter with block-Gibbs updates. One of his graduate students attempted tosample both of the weights and hyperparameters with HMC but did not get better performance, mostly because of the highly skewed distribution common in hierarchical models. With the invention of RMHMC and its successful application to sample more efficiently from hierarchical models, it would be interesting to try to see if this method can be adapted to sample from the posterior distribution of a BNN. 
 
 For some theory on why, for the same number of hidden layers, it would be better to have multiple layers in a NN rather than a wide single-layer network, see \cite{montufar2014number}. 
-
-
-
-\esnd{enumerate}
 \section{MCMC methods applied to hierarchical models}
+\begin{enumerate}
 \item Centered vs uncentered parametrization in hierarchical models.
 
 \item Deal with skewness through Riemanian Manifold Hamiltonian Monte Carlo
@@ -822,12 +820,14 @@ information matrix. Importantly, the precision matrices $G_\theta(\theta)$,
 $G_\phi(\phi)$
 are dependent on the varaibles they are modeling. In semi-separable Hamiltonian
 Monte Carlo (SSHMC), the precision matrix has the form
+\iffalse
 \[ G(\theta,\phi) = 
     \begin{align}
     &G_\theta(\phi,x) & 0 \\
     &0 &G_\phi(\theta)
     \end{align}
 \]
+\fi
 While giving up information about the local curvature of $\theta$, this modeling
 assumption can deal with the correlation between the parameters and
 the hyperparameters, which gives enough improvement in mixing speed to yield
@@ -842,7 +842,7 @@ r_\phi|\theta,\phi)\] can then be rewritten as the sum of two Hamiltonians
 Even though the original Hamiltonian $H$ is not separable, the two Hamiltonians that
 sum to $H$ are separable when looked at separately. This enables the simple
 leapfrog to be used instead of the more time consuming generalized leapfrog.
-
+\iffalse
 \begin{algorithm}
     \caption{SSHMC}
     \comment{Input:$L,\epsilon,\theta_0,\phi_0$}
@@ -858,6 +858,7 @@ leapfrog to be used instead of the more time consuming generalized leapfrog.
     \State{Acceptance-Rejection Step}
     \EndFor
 \end{algorithm}
+\fi
 \section{approximate inference for fast training and prediction}
 
 Because of the challenges of MCMC sampling from the posterior distribution of
@@ -903,7 +904,7 @@ in a way that compresses model knowledge.
 Why do we assume the prior distribution of weight parameters to be normal centered at 0?
 
 Study of prior distributions in neural networks.\cite{lampinen2001bayesian,titterington2004bayesian}
-
+\end{enumerate}
 \section{Scaling MCMC methods to large datasets}
 
 In modern deep learning, fitting of neural network models usually is done by stochastic gradient descent (SGD) \cite{ngiam2011optimization}.
@@ -924,7 +925,7 @@ Marginal predictive distributions or any expectation taken with respect to the p
 This estimator has lower variance than the naive alternative $\frac{1}{T} \sum_{t=1}^T f(\theta_t) $ and is unbiased as well. 
 
 The author proved that as the stepsizes $\epsilon_t$ goes to $0$ the samples $\{\theta_t\}$ converge tothe Langevin dynamics targeting the posterior distribution. Of course, in practice we set lower bound on $\epsilon_t$ and stop decreasing the stepsize once it is small enough. Also, the fact the we are not doing the acceptance-rejection step means there will be a bias in our posterior samples, which unlike the samples drawn from a Metropolis-Hastings sampler, does not decrese to $0$ as we sample from the chain longer.
-
+\iffalse
 \begin{algorithm}
     \caption{Stochastic Gradient Langevin Dynamics}
     \comment{Input: N,n,\theta_0,\{\epsilon_t\}_{t=1}^T}
@@ -937,6 +938,7 @@ The author proved that as the stepsizes $\epsilon_t$ goes to $0$ the samples $\{
     p(x_{ti}|\theta_t))+\eta_t$}
     \EndFor
 \end{algorithm}
+\fi
 Simulating from the discrete approximation to a Langevin dynamics is the basis
 for Langevin Monte Carlo or Metropolis adjusted Langevin Algorithm, which
 includes an acceptance-rejection step at each update. This can also be seen as a
@@ -945,7 +947,7 @@ demonstrated that HMC is much more efficient than LMC because it avoids random
 walk. (Show $O(d^{4/3})$ vs $O(d^{5/4})$ kind of results). This inspires
 Stochastic Gradient Hamilotian Monte Carlo (SGHMC) \cite{chen2014stochastic},
 which extends HMC the way SGLD extends LMC. 
-
+\iffalse
 \begin{algorithm}
     \caption{Stochastic Gradient HMC}
     \comment{Input: $\eta,\alpha,n,T,m,\theta_0$
@@ -963,6 +965,7 @@ which extends HMC the way SGLD extends LMC.
         \State{$\v_t = v^{m}$}
         \EndFor
 \end{algorithm}
+\fi
 Important points to retain: connection to sgd with momentum. dont know how to
 set $C$ matrix. noise of gradient $B$ not actually estimated in any of the
 examples in the paper claiming as stepsizes goes to zero the noise goes to zero
@@ -970,6 +973,7 @@ as well. The estimation can be done using along diagonal approximation, or
 low-rank approximations. 
 
 Preconditioned SGLD
+\iffalse
 \begin{algorithm}
     \caption{pSGLD}
     \comment{Input $\{\eta_t\}_{t=1}^T , \lambda, \beta, \theta_0$}
@@ -983,11 +987,13 @@ Preconditioned SGLD
 \psi_t$}
     \EndFor
 \end{algorithm}
+\fi
 Sampling via Stochastic Gradient Fisher-Scoring (SGFS) was proposed in
 \cite{ahn2012bayesian}.
 
 
 Sampling via Stochastic Gradient thermostat. 
+\iffalse
 \begin{algorithm}
     \caption{SG Thermostat}
     \comment{Input: $\eta,a,\theta_0$}
@@ -1008,7 +1014,7 @@ Sampling via pre-conditioned Stochastic Gradient langevin dynamics.
     \For{t in 1:T}
 
 \end{algorithm}
-
+\fi
 Applying MCMC methods to large datasets often involve 2 problems. First, evaluating the unnormalized posterior density
 \[ p(D|\theta) = \prod_{i=1}^n p(x_i|\theta) \]
  is equivalent to passing through all datapoints, which alone can make the sampling algorithm unacceptably slow since all versions of the Metropolis-Hastings sampler requires such evaluations for proposing new samples. Second, models that require MCMC samples when a large number of datapoints are available are necessarily singular models. Using the terminology of \cite{watanabe2009algebraic}, regular models are models for which the bayesian central limit theorem \cite{le2012asymptotic} holds, that is, when the number of observations goes to infinity the posterior distribution of $\theta$ converges to a Gaussian distribution. Models that are non-regular are called singular models. A lot of methods designed to scale MCMC \cite{neiswanger2013asymptotically,scott2016bayes,} ultimately rely on this asymptotic normality for validity. Bayesian logistic regression is a classical model for which the CLT holds and is used in many papers to demonstrate the effectiveness of newly proposed large-scale MCMC methods. However, the very fact that asympotitic normality holds means there is little added utility to drawing MCMC samples from the posterior distribution, since a normal approximation would suffice. On the other hand, for singular models there is no guarantee that the estimates converge to the target posterior distribution. 
@@ -1027,8 +1033,7 @@ $\theta$ can be written as
 p(\theta)^{1/S} \]
 where $\{\mathbf{x}_s\}_{s=1}^S$ is a disjoint partition of the original data.
 Technically, in this formulation, each subset can be of variable size. But for
-the purpose of computational efficiency we assume $|\mathbf{x}_s}|=\frac{N}{S}
-\forall s$. 
+the purpose of computational efficiency we assume $|\mathbf{x}_s|=\frac{N}{S}\forall s$. 
 
 Now, for each subset $\mathbf{x}_s$, we draw $G$ samples $\theta_{s1},\dots,
 \theta_{sG}$ from
@@ -1039,7 +1044,7 @@ where $W_s$ is a weighting matrix. For models where the posterior distributions
 $p(\theta|\mathbf{x}_s)$ are Gaussian. $\sum_{s} =
 Var(\theta|\mathbf{x}_s)^{-1}$ is exact. By the bayesian central limit theorem,
 for regular models the normal approximation for the posterior distribution is
-arbitrarily good, so we can use the inverse of the empirical variance as $W_s$.
+arbitrarily good, so we can use the inverse of the empirical variance as $W_s$
 There is no theoretical guarantee that normal approximation to the posterior
 distribution for neural network models is accurate. 
 
@@ -1048,6 +1053,7 @@ marginal variances for $W_s$.
 
 This is a general methodology that can be coupled with any sampling methods, be
 it MCMC or exact sampling. 
+\iffalse
 \begin{algorithm}
     \caption{Consensus Monte Carlo}
     \comment{Input: $S,G, \mathbf{x}$}
@@ -1059,7 +1065,7 @@ it MCMC or exact sampling.
     \State Combine the draws for $g=1,\dots,G$:$ \theta_g = (\sum_{s=1}^S
     W_s)^{-1}(\sum_s W_s \theta_{sg})$
 \end{algorithm}
-
+\fi
 Scaling based on splitting techniques from Neal. Random data subset used to approximate the Hamiltonianduring leapfrog step but uses the full dataset for calculating the Hastings ratio. Retains convergence to invariant distribution. 
 
 
@@ -1158,12 +1164,13 @@ distance.
 
 Can it beat grid search?
 Compare ESS/L. 
-
+\iffalse
 \begin{algorithm}
     \caption{Bayesian optimization}
     \State
     \State $p$ is the dimension
 \end{algorithm}
+\fi
 \section{Bayesian Model Selection and Prediction}
 In a neural network model there are multiple hyperparameters left to be tuned be
 the user. These include the number of hidden layers, the number of hidden
@@ -1188,7 +1195,7 @@ $i$th datapoint $\{y_i,x_i\}$, and $d_{-i}$ are the $n-1$ remaining data points.
 Then
 \[ lppd_{loo-cv} = \sum_{i=1}^n \log p_{post(-i)}(d_i) \]
 where 
-\[p_{post(-i)(d_i) = \int p(y_i|x_i,\theta) p(\theta|d_{-i}) d\theta \]
+\[p_{post(-i)}(d_i) = \int p(y_i|x_i,\theta) p(\theta|d_{-i}) d\theta \]
 which is the marginal predictive density of the $i$th data point, with $\theta$
 integrated out with respect to the posterior density of $\theta$ having observed
 the remaining $n-1$ data points. In practice, the integration is performed
@@ -1245,7 +1252,7 @@ Once we have selected a model, we can make predictions about new data using its 
 If this is a classification problem of $C$ classes we would evaluate $p(y_{new}|D)$ for all $y_{new}=1,\dots, C$, and if a regression problem a number of points on the domain of the output can be evaluated 
 and a prediction made by drawing from the empirical distribution. 
 
-\sectionc{Multiple Modes}
+\section{Multiple Modes}
 
 Neural network models are known to have multiple modes, although it is widely believed that most local modes have similar likelihood values to the global mode. In Neal's work on bayesian neural network, he also assumed that multimodality would not cause any problems in inference and in prediction. 
 
